@@ -1,6 +1,6 @@
-# Running Hot bot
+# Bot Heard Round The Universe
 
-This is the code for the bot used for Running Hot online version.
+This is the code for the bot used for The Shot Heard Round The Universe
 
 To run:
 
