@@ -136,7 +136,7 @@ class FleetList:
         self.columns = columns
 
     @classmethod
-    def from_list(cls, fleet_str: str):
+    def from_str(cls, fleet_str: str):
         """
 
         :rtype: FleetList
@@ -152,6 +152,9 @@ class FleetList:
         )
 
         for ship_def in fleet:
+            if ship_def == '':
+                continue
+
             match = add_fleet_ship_regex.match(ship_def)
 
             if not match:
@@ -159,7 +162,7 @@ class FleetList:
 
             ship = Ship(
                 current_health=int(match.group(2)),
-                ship_type=ShipType.from_str(match.group(1))
+                ship_type=ShipType.from_char(match.group(1))
             )
 
             (column_num, position) = (int(match.group(3)), int(match.group(4)))
@@ -177,3 +180,9 @@ class FleetList:
         :return:
         """
         return list(filter(lambda x: x.combat_column == combat_column, self.columns))
+
+    def __eq__(self, other):
+        if not isinstance(other, FleetList):
+            return False
+
+        return self.columns == other.columns

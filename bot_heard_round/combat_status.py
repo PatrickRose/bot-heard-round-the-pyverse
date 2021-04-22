@@ -1,12 +1,13 @@
-'''
+"""
 Module holding the combat status content
-'''
+"""
 
 import enum
 import re
 from typing import Optional
 
 import discord
+from discord import WidgetMember
 
 from bot_heard_round.fleet import FleetList, CombatColumn
 from bot_heard_round.utils import get_user_from_nick_or_name
@@ -15,48 +16,58 @@ attack_defend_regex = re.compile('(Attacker|Defender): `(.+)`')
 round_regex = re.compile('`!!! Combat status( - round (\\d)| - finished)? !!!`')
 ship_regex = re.compile('`(.+?) \\((\\w+) (\\d+)/(\\d+)\\)`')
 
+UserAndFleet = tuple[discord.WidgetMember, FleetList]
+
 
 class CombatRound(enum.Enum):
-    '''
+    """
     Enum for the different combat rounds
-    '''
+    """
     PENDING = 0
     MISSILE_ONE = 1
     MISSILE_TWO = 2
-    RAILGUN = 3
+    RAIL_GUN = 3
     FINISHED = 4
 
 
 class CombatStatus:
-    '''
+    """
     Encapsulates the combat status for the current combat
-    '''
+    """
+    attacker: WidgetMember
+    attacker_fleet: FleetList
+    defender: WidgetMember
+    defender_fleet: FleetList
 
     def __init__(self,
-                 attacker: (discord.User, FleetList),
-                 defender: (discord.User, FleetList),
-                 combat_round=CombatRound.PENDING):
+                 attacker,
+                 defender,
+                 combat_round: CombatRound = CombatRound.PENDING):
+        if not isinstance(attacker, tuple):
+            attacker = (attacker, FleetList())
+        if not isinstance(defender, tuple):
+            defender = (defender, FleetList())
 
         self.attacker = attacker[0]
-        self.defender = defender[1]
-        self.attacker_fleet = attacker[1] or FleetList()
-        self.defender_fleet = defender[1] or FleetList()
+        self.defender = defender[0]
+        self.attacker_fleet = attacker[1]
+        self.defender_fleet = defender[1]
         self.combat_round = combat_round
 
-    def add_fleet_for(self, user: discord.User, fleet: str):
+    def add_fleet_for(self, user: discord.WidgetMember, fleet: str):
         """
 
         :param user:
         :param fleet:
         """
         if user.id == self.attacker.id:
-            self.attacker_fleet = FleetList.from_list(fleet)
+            self.attacker_fleet = FleetList.from_str(fleet)
         else:
-            self.defender_fleet = FleetList.from_list(fleet)
+            self.defender_fleet = FleetList.from_str(fleet)
 
     def __str__(self):
-        attacker = self.attacker.nick or self.attacker.name
-        defender = self.defender.nick or self.defender.name
+        attacker = self.attacker.display_name
+        defender = self.defender.display_name
 
         attacker_fleet_waiting = self.attacker_fleet.where_column(CombatColumn.WAITING)
 
@@ -76,7 +87,7 @@ class CombatStatus:
             status = "`!!! Combat status - round 1 !!!`"
         elif self.combat_round == CombatRound.MISSILE_TWO:
             status = "`!!! Combat status - round 2 !!!`"
-        elif self.combat_round == CombatRound.RAILGUN:
+        elif self.combat_round == CombatRound.RAIL_GUN:
             status = "`!!! Combat status - round 3 !!!`"
         else:
             status = "`!!! Combat status - finished !!!`"
@@ -90,14 +101,14 @@ class CombatStatus:
         if attacker_fleet_waiting:
             rows.append(
                 "Attacker ships to apply:\n{}".format(
-                    '\n'.join(['`{}`'.format(str(x)) for x in attacker_fleet_waiting])
+                    '\n'.join(['{}'.format(str(x)) for x in attacker_fleet_waiting])
                 )
             )
 
         if defender_fleet_waiting:
             rows.append(
                 "Defender ships to apply:\n{}".format(
-                    '\n'.join(['`{}`'.format(str(x)) for x in defender_fleet_waiting])
+                    '\n'.join(['{}'.format(str(x)) for x in defender_fleet_waiting])
                 )
             )
 
@@ -123,7 +134,20 @@ class CombatStatus:
 
         :rtype: bool
         """
-        return bool(self.attacker_fleet.ships and self.defender_fleet.ships)
+        attacker = False
+        defender = False
+
+        for column in self.attacker_fleet.columns:
+            if column.ships:
+                attacker = True
+                break
+
+        for column in self.defender_fleet.columns:
+            if column.ships:
+                defender = True
+                break
+
+        return attacker and defender
 
     @classmethod
     async def from_message(cls, message: discord.Message):
@@ -142,7 +166,6 @@ class CombatStatus:
         members = await message.guild.fetch_members().flatten()
 
         for line in content.split("\n"):
-
             match = round_regex.match(line)
             if match:
                 combat_round = cls.make_combat_round(match)
@@ -163,8 +186,8 @@ class CombatStatus:
                 else:
                     defender = user
 
-        if not attacker or defender:
-            raise ValueError('Missing an attacker or defender?')
+        if not attacker or not defender:
+            raise ValueError('Missing an attacker or defender in the pinned message?')
 
         return CombatStatus(
             (attacker, attacker_ships),
@@ -188,6 +211,6 @@ class CombatStatus:
                 'EMPTY',
                 CombatRound.MISSILE_ONE,
                 CombatRound.MISSILE_TWO,
-                CombatRound.RAILGUN
+                CombatRound.RAIL_GUN
             ][int(match.group(2))]
         return combat_round

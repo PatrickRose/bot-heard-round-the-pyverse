@@ -24,6 +24,20 @@ class ShipType(enum.Enum):
         return str_rep[self]
 
     @classmethod
+    def from_char(cls, char: str):
+        """
+
+        :param char:
+        :return:
+        """
+        str_rep = {
+            'F': ShipType.FIGHTER,
+            'C': ShipType.CRUISER,
+        }
+
+        return str_rep[char]
+
+    @classmethod
     def from_str(cls, from_str: str):
         """
 

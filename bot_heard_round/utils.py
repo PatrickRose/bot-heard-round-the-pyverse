@@ -11,7 +11,7 @@ def get_user_from_nick_or_name(name_nick: str, members: list[discord.User]) -> d
     :param members:
     :return: The discord user, otherwise none
     """
-    user = discord.utils.get(members, nick=name_nick)
-    if not user:
-        user = discord.utils.get(members, name=name_nick)
+    user = discord.utils.get(members, display_name=name_nick)
+    # if not user:
+    #     user = discord.utils.get(members, name=name_nick)
     return user
