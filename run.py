@@ -1,18 +1,14 @@
 # bot.py
-import datetime
-import json
-import math
 import os
 import random
 import re
-import base64
-import json
-import enum
 
 import discord
-import tabulate
 from discord.ext import commands
 from dotenv import load_dotenv
+
+from bot_heard_round.CombatColumn import CombatColumn
+from bot_heard_round.CombatStatus import CombatRound, CombatStatus
 
 intents = discord.Intents.default()
 intents.members = True
@@ -23,246 +19,7 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 command_prefix = os.getenv('COMMAND_PREFIX', '!')
 bot = commands.Bot(command_prefix=command_prefix, intents=intents)
 combat_category_name = 'combat'
-attack_defend_regex = re.compile('(Attacker|Defender): `(.+)`')
-round_regex = re.compile('`!!! Combat status( - round (\d)| - finished)? !!!`')
-fleet_list_regex = re.compile('(Attacker|Defender) ships to apply: (.+)')
-ship_regex = re.compile('`(.+?) \\((\w+) (\d+)/(\d+)\\)`')
 bot_master_role = 'bot-master'
-
-
-class ShipType(enum.Enum):
-    CRUISER = 'Cruiser'
-    FIGHTER = 'Fighter'
-
-
-class Ship:
-
-    def __init__(self, name: str, max_health: int, current_health: int, ship_type: ShipType):
-        self.name = name
-        self.max_health = max_health
-        self.current_health = current_health
-        self.ship_type = ship_type
-
-    def __str__(self):
-        return '{} ({} {}/{})'.format(
-            self.name,
-            self.ship_type,
-            self.max_health,
-            self.current_health
-        )
-
-
-class CombatRound(enum.Enum):
-    PENDING = 0,
-    MISSILE_ONE = 1,
-    MISSILE_TWO = 2,
-    RAILGUN = 3
-    FINISHED = 4
-
-
-class CombatColumn(enum.Enum):
-    WAITING = 'waiting'
-    LEFT = 'left'
-    MIDDLE = 'middle'
-    RIGHT = 'right'
-
-
-class Position:
-
-    def __init__(self, combat_column: CombatColumn, position: int):
-        self.combat_column = combat_column
-        self.position = position
-
-
-class FleetList:
-
-    def __init__(self, ships: list[tuple[Ship, Position]] = None):
-        if ships is None:
-            ships = []
-
-        self.ships = ships
-
-    def where_column(self, column: CombatColumn):
-        return list(
-            filter(
-                lambda x: x[1].combat_column == column,
-                self.ships
-            )
-        )
-
-    def move_ship(self, ship: Ship, column: CombatColumn):
-        ships_in_column = self.where_column(column)
-
-        if ships_in_column:
-            position = max([x[1].position for x in ships_in_column]) + 1
-        else:
-            position = 0
-
-        for curr_ship in self.ships:
-            if curr_ship[0] == ship:
-                curr_ship[1] = Position(column, position)
-                break
-
-    def add_ship(self, ship: Ship, position: Position):
-        self.ships.append((ship, position))
-
-    @classmethod
-    def from_list(cls, fleet: list):
-        ships = []
-
-        for ship_def in fleet:
-            ship = Ship(ship_def["name"], ship_def["max_health"], ship_def["current_health"], ship_def["type"])
-            position = Position(CombatColumn.WAITING, -1)
-            ships.append((ship, position))
-
-        return FleetList(ships)
-
-
-class CombatStatus:
-
-    def __init__(self, attacker: discord.User, defender: discord.User, attacker_fleet=None, defender_fleet=None,
-                 combat_round=CombatRound.PENDING):
-        if attacker_fleet is None:
-            attacker_fleet = FleetList()
-        if defender_fleet is None:
-            defender_fleet = FleetList()
-
-        self.attacker = attacker
-        self.defender = defender
-        self.attacker_fleet = attacker_fleet
-        self.defender_fleet = defender_fleet
-        self.combat_round = combat_round
-
-    def add_fleet_for(self, user: discord.User, fleet: list):
-        if user.id == self.attacker.id:
-            self.attacker_fleet = FleetList.from_list(fleet)
-        else:
-            self.defender_fleet = FleetList.from_list(fleet)
-
-    def __str__(self):
-        attacker = self.attacker.nick or self.attacker.name
-        defender = self.defender.nick or self.defender.name
-
-        attacker_fleet_waiting = self.attacker_fleet.where_column(CombatColumn.WAITING)
-
-        defender_fleet_waiting = self.defender_fleet.where_column(CombatColumn.WAITING)
-
-        attacker_fleet_waiting.sort(
-            key=lambda x: x[0].name
-        )
-
-        defender_fleet_waiting.sort(
-            key=lambda x: x[0].name
-        )
-
-        if self.combat_round == CombatRound.PENDING:
-            status = "`!!! Combat status !!!`"
-        elif self.combat_round == CombatRound.MISSILE_ONE:
-            status = "`!!! Combat status - round 1 !!!`"
-        elif self.combat_round == CombatRound.MISSILE_TWO:
-            status = "`!!! Combat status - round 2 !!!`"
-        elif self.combat_round == CombatRound.RAILGUN:
-            status = "`!!! Combat status - round 3 !!!`"
-        else:
-            status = "`!!! Combat status - finished !!!`"
-
-        rows = [
-            status,
-            "Attacker: `{}`".format(attacker),
-            "Defender: `{}`".format(defender)
-        ]
-
-        if attacker_fleet_waiting:
-            rows.append(
-                "Attacker ships to apply: {}".format(
-                    ', '.join(['`{}`'.format(str(x[0])) for x in attacker_fleet_waiting])
-                )
-            )
-
-        if defender_fleet_waiting:
-            rows.append(
-                "Defender ships to apply: {}".format(
-                    ', '.join(['`{}`'.format(str(x[0])) for x in defender_fleet_waiting])
-                )
-            )
-
-        attacker_fleet_ready = self.attacker_fleet.where_column(CombatColumn.MIDDLE)
-        defender_fleet_ready = self.defender_fleet.where_column(CombatColumn.MIDDLE)
-
-        if attacker_fleet_ready or defender_fleet_ready:
-            attacker_fleet_ready.sort(key=lambda x: x[1].position, reverse=True)
-            defender_fleet_ready.sort(key=lambda x: x[1].position)
-
-            rows.append(
-                '```\n' + tabulate.tabulate(
-                    [str(x[0]) for x in attacker_fleet_ready] + ['------'] + [str(x[0]) for x in defender_fleet_ready]
-                ) + '\n```'
-            )
-
-        return "\n".join(rows)
-
-    def ready_for_combat(self):
-        return self.attacker_fleet.ships and self.defender_fleet.ships
-
-    @classmethod
-    async def from_message(cls, message: discord.Message):
-        content = message.content
-        attacker: discord.User
-        defender: discord.User
-        defender_ships = FleetList()
-        attacker_ships = FleetList()
-
-        members = await message.guild.fetch_members().flatten()
-
-        for line in content.split("\n"):
-
-            match = round_regex.match(line)
-            if match:
-                if match.group(2) is None:
-                    combat_round = CombatRound.PENDING if match.group(1) is None else CombatRound.FINISHED
-                else:
-                    combat_round = [
-                        'EMPTY',
-                        CombatRound.MISSILE_ONE,
-                        CombatRound.MISSILE_TWO,
-                        CombatRound.RAILGUN
-                    ][int(match.group(2))]
-
-            match = attack_defend_regex.match(line)
-
-            if match:
-                attack_defend = match.group(1)
-                name_nick = match.group(2)
-
-                user = discord.utils.get(members, nick=name_nick)
-
-                if not user:
-                    user = discord.utils.get(members, name=name_nick)
-
-                if not user:
-                    raise ValueError('Could not find user with name/nickname {}'.format(name_nick))
-
-                if attack_defend == 'Attacker':
-                    attacker = user
-                else:
-                    defender = user
-
-            match = fleet_list_regex.match(line)
-
-            if match:
-                attack_defend = match.group(1)
-                ships = match.group(2)
-                if attack_defend == 'Attacker':
-                    ship_list = attacker_ships
-                else:
-                    ship_list = defender_ships
-
-                for group in ship_regex.finditer(ships):
-                    ship = Ship(name=group[1], ship_type=group[2], current_health=group[3], max_health=group[4])
-
-                    ship_list.add_ship(ship, Position(CombatColumn.WAITING, -1))
-
-        return CombatStatus(attacker, defender, attacker_ships, defender_ships, combat_round=combat_round)
 
 
 @bot.event
@@ -300,7 +57,7 @@ async def start_combat(ctx: commands.context.Context, target: str):
         return
     elif len(ctx.message.mentions) > 1:
         await ctx.reply("Only allowed to attack one person")
-        return;
+        return
 
     defender = ctx.message.mentions[0]
 
@@ -308,7 +65,7 @@ async def start_combat(ctx: commands.context.Context, target: str):
 
     await ctx.send(
         'Starting combat, {} attacks {}...'.format(ctx.author.mention, target)
-    );
+    )
 
     category: discord.CategoryChannel = discord.utils.get(guild.categories, name='combat')
 
@@ -327,7 +84,7 @@ async def start_combat(ctx: commands.context.Context, target: str):
         random_bytes = random.getrandbits(16)
 
         channel_name = f"combat-{random_bytes}"
-        # Next, create the run-* role
+        # Next, create the combat-* role
         channel = discord.utils.get(guild.roles, name=channel_name, category=category)
 
         if not channel:
@@ -352,7 +109,7 @@ async def start_combat(ctx: commands.context.Context, target: str):
             defender.mention,
             command_prefix
         )
-    );
+    )
 
 
 @bot.command(
@@ -408,11 +165,7 @@ async def add_fleet_list(ctx: commands.context.Context, fleet_list: str):
 
     user = ctx.author
 
-    decoded_fleet = base64.b64decode(fleet_list, validate=True)
-
-    fleet_obj = json.loads(decoded_fleet)
-
-    combat_status.add_fleet_for(user, fleet_obj)
+    combat_status.add_fleet_for(user, fleet_list)
 
     await message.edit(content=combat_status)
 
@@ -485,17 +238,17 @@ async def start_combat_loop(message: discord.Message, combat_status: CombatStatu
         await bot.wait_for(
             'reaction_add',
             check=lambda reaction, user: reaction.message == attacker_ships_message and (
-                        reaction.emoji == '🚫' or reaction.emoji in ship_list) and user == combat_status.attacker
+                    reaction.emoji == '🚫' or reaction.emoji in ship_list) and user == combat_status.attacker
         ),
         await bot.wait_for(
             'reaction_add',
             check=lambda reaction, user: reaction.message == attacker_ships_message and (
-                        reaction.emoji == '🚫' or reaction.emoji in ship_list) and user == combat_status.attacker
+                    reaction.emoji == '🚫' or reaction.emoji in ship_list) and user == combat_status.attacker
         ),
         await bot.wait_for(
             'reaction_add',
             check=lambda reaction, user: reaction.message == attacker_ships_message and (
-                        reaction.emoji == '🚫' or reaction.emoji in ship_list) and user == combat_status.attacker
+                    reaction.emoji == '🚫' or reaction.emoji in ship_list) and user == combat_status.attacker
         )
     ]
 
@@ -511,5 +264,5 @@ async def start_combat_loop(message: discord.Message, combat_status: CombatStatu
 bot.run(TOKEN)
 
 # Local Variables:
-# jedi:environment-root: "bot-heard-round"
+# jedi:environment-root: "bot_heard_round"
 # End:
