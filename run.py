@@ -1,14 +1,16 @@
+"""
+Bot starter
+"""
 # bot.py
 import os
 import random
-import re
 
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
-from bot_heard_round.CombatColumn import CombatColumn
-from bot_heard_round.CombatStatus import CombatRound, CombatStatus
+from bot_heard_round.combat_status import CombatRound, CombatStatus
+from bot_heard_round.fleet import CombatColumn
 
 intents = discord.Intents.default()
 intents.members = True
@@ -16,46 +18,66 @@ intents.members = True
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
-command_prefix = os.getenv('COMMAND_PREFIX', '!')
-bot = commands.Bot(command_prefix=command_prefix, intents=intents)
-combat_category_name = 'combat'
-bot_master_role = 'bot-master'
+COMMAND_PREFIX = os.getenv('COMMAND_PREFIX', '!')
+bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
+COMBAT_CATEGORY_NAME = 'combat'
+BOT_MASTER_ROLE = 'bot-master'
 
 
 @bot.event
 async def on_ready():
+    """
+
+    :return:
+    """
     print(f'{bot.user.name} has connected to Discord!')
 
 
 @bot.event
 async def on_command_error(ctx, error):
+    """
+
+    :param ctx:
+    :param error:
+    :return:
+    """
     if isinstance(error, commands.errors.CheckFailure):
         await ctx.send('You do not have the correct role for this command.')
     elif isinstance(error, commands.errors.MissingRequiredArgument):
         await ctx.send(error)
     elif isinstance(error, commands.errors.CommandNotFound):
-        await ctx.send("Unknown command - try {0}help to see the available commands".format(command_prefix))
-        pass
+        await ctx.send(
+            "Unknown command - try {0}help to see the available commands".format(COMMAND_PREFIX)
+        )
     else:
-        control = discord.utils.get(ctx.guild.roles, name=bot_master_role)
+        control = discord.utils.get(ctx.guild.roles, name=BOT_MASTER_ROLE)
 
-        await ctx.send(f'{control.mention} there was a problem running this command please investigate')
+        await ctx.send(
+            f'{control.mention} there was a problem running this command please investigate'
+        )
         raise error
 
 
-control_role_name = 'Control' if os.getenv('UPPERCASE_CONTROL') else 'control'
+CONTROL_ROLE_NAME = 'Control' if os.getenv('UPPERCASE_CONTROL') else 'control'
 
 
 @bot.command(
     name='start-combat',
 )
 async def start_combat(ctx: commands.context.Context, target: str):
+    """
+
+    :param ctx:
+    :param target:
+    :return:
+    """
     attacker = ctx.author
 
     if len(ctx.message.mentions) == 0:
         await ctx.reply("Please use the mention format (ie `@person-to-attack`)")
         return
-    elif len(ctx.message.mentions) > 1:
+
+    if len(ctx.message.mentions) > 1:
         await ctx.reply("Only allowed to attack one person")
         return
 
@@ -69,11 +91,11 @@ async def start_combat(ctx: commands.context.Context, target: str):
 
     category: discord.CategoryChannel = discord.utils.get(guild.categories, name='combat')
 
-    control = discord.utils.get(guild.roles, name=control_role_name)
+    control = discord.utils.get(guild.roles, name=CONTROL_ROLE_NAME)
 
     if not category:
         category = await guild.create_category(
-            combat_category_name,
+            COMBAT_CATEGORY_NAME,
             overwrites={
                 guild.default_role: discord.PermissionOverwrite(read_messages=False),
                 control: discord.PermissionOverwrite(read_messages=True),
@@ -100,14 +122,15 @@ async def start_combat(ctx: commands.context.Context, target: str):
 
     combat_status = CombatStatus(attacker, defender)
 
-    status = await channel.send(combat_status)
+    status = await channel.send(str(combat_status))
     await status.pin()
 
     await channel.send(
-        'Combat started, {} attacks {}\nPlease use the `{}fleet-list` command to import your fleet'.format(
+        'Combat started, {} attacks {}\n'
+        'Please use the `{}fleet-list` command to import your fleet'.format(
             attacker.mention,
             defender.mention,
-            command_prefix
+            COMMAND_PREFIX
         )
     )
 
@@ -115,11 +138,16 @@ async def start_combat(ctx: commands.context.Context, target: str):
 @bot.command(
     name='clear-combat',
 )
-@commands.has_role(control_role_name)
+@commands.has_role(CONTROL_ROLE_NAME)
 async def clear_combat(ctx: commands.context.Context):
+    """
+
+    :param ctx:
+    :return:
+    """
     guild = ctx.guild
 
-    category = discord.utils.get(guild.categories, name=combat_category_name)
+    category = discord.utils.get(guild.categories, name=COMBAT_CATEGORY_NAME)
 
     if not category:
         return
@@ -135,6 +163,11 @@ async def clear_combat(ctx: commands.context.Context):
 
 
 async def combat_status_from_context(ctx: commands.context.Context):
+    """
+
+    :param ctx:
+    :return:
+    """
     channel: discord.TextChannel = ctx.channel
     pins = await channel.pins()
     if not pins:
@@ -146,13 +179,19 @@ async def combat_status_from_context(ctx: commands.context.Context):
 
 @bot.command(name='fleet-list')
 async def add_fleet_list(ctx: commands.context.Context, fleet_list: str):
+    """
+
+    :param ctx:
+    :param fleet_list:
+    :return:
+    """
     try:
         message, combat_status = await combat_status_from_context(ctx)
-    except ValueError as e:
+    except ValueError as error:
         await ctx.reply(
             '{} - tag `@{}` if you need help'.format(
-                e.args[0],
-                bot_master_role
+                error.args[0],
+                BOT_MASTER_ROLE
             )
         )
         return
@@ -176,6 +215,12 @@ async def add_fleet_list(ctx: commands.context.Context, fleet_list: str):
 
 
 async def start_combat_loop(message: discord.Message, combat_status: CombatStatus):
+    """
+
+    :param message:
+    :param combat_status:
+    :return:
+    """
     channel = message.channel
 
     combat_status.combat_round = CombatRound.MISSILE_ONE
@@ -190,15 +235,21 @@ async def start_combat_loop(message: discord.Message, combat_status: CombatStatu
     for emoji in ['⚔', '🏳']:
         await react_message.add_reaction(emoji)
 
+    def check_react(user_to_check):
+        def tmp(reaction, user):
+            return reaction.message == react_message and \
+                   reaction.emoji in ['⚔', '🏳'] and \
+                   user == user_to_check
+
+        return tmp
+
     attack_react = await bot.wait_for(
         'reaction_add',
-        check=lambda reaction, user: reaction.message == react_message and reaction.emoji in ['⚔',
-                                                                                              '🏳'] and user == combat_status.attacker
+        check=check_react(combat_status.attacker)
     )
     defend_react = await bot.wait_for(
         'reaction_add',
-        check=lambda reaction, user: reaction.message == react_message and reaction.emoji in ['⚔',
-                                                                                              '🏳'] and user == combat_status.defender
+        check=check_react(combat_status.defender)
     )
 
     if '⚔' not in [attack_react[0].emoji, defend_react[0].emoji]:
@@ -223,7 +274,8 @@ async def start_combat_loop(message: discord.Message, combat_status: CombatStatu
 
     ## Ask the attacker to add 3 ships
     attacker_ships_message = await channel.send(
-        "{}, please react to this with the ships you want to add. Choose 🚫 to stop adding\n{}".format(
+        "{}, please react to this with the ships you want to add."
+        "Choose 🚫 to stop adding\n{}".format(
             combat_status.attacker.mention,
             "\n".join(ship_text)
         )
@@ -234,21 +286,23 @@ async def start_combat_loop(message: discord.Message, combat_status: CombatStatu
     for emoji in ship_list:
         await attacker_ships_message.add_reaction(emoji)
 
+    def check_activated(reaction, user):
+        return reaction.message == attacker_ships_message \
+               and (reaction.emoji == '🚫' or reaction.emoji in ship_list) \
+               and user == combat_status.attacker
+
     activated = [
         await bot.wait_for(
             'reaction_add',
-            check=lambda reaction, user: reaction.message == attacker_ships_message and (
-                    reaction.emoji == '🚫' or reaction.emoji in ship_list) and user == combat_status.attacker
+            check=check_activated
         ),
         await bot.wait_for(
             'reaction_add',
-            check=lambda reaction, user: reaction.message == attacker_ships_message and (
-                    reaction.emoji == '🚫' or reaction.emoji in ship_list) and user == combat_status.attacker
+            check=check_activated
         ),
         await bot.wait_for(
             'reaction_add',
-            check=lambda reaction, user: reaction.message == attacker_ships_message and (
-                    reaction.emoji == '🚫' or reaction.emoji in ship_list) and user == combat_status.attacker
+            check=check_activated
         )
     ]
 

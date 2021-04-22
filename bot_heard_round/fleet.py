@@ -1,13 +1,30 @@
+"""
+Fleet module
+"""
+
+import enum
 import re
 
-from bot_heard_round.CombatColumn import CombatColumn
-from bot_heard_round.Ship import Ship, ShipType
+from bot_heard_round.ship import Ship, ShipType
 
-add_fleet_ship_regex = re.compile('(.)(\\d+)\\[(\\d+),(\\d+)\\]')
+add_fleet_ship_regex = re.compile('(.)(\\d+)\\[(\\d+),(\\d+)]')
 fleet_column_regex = re.compile('Fleet column (\\d+)')
 
 
+class CombatColumn(enum.Enum):
+    """
+    Enum for the different combat columns
+    """
+    WAITING = 'waiting'
+    LEFT = 'left'
+    MIDDLE = 'middle'
+    RIGHT = 'right'
+
+
 class FleetColumn:
+    """
+    Fleet column
+    """
 
     def __init__(self,
                  column_number: int,
@@ -22,6 +39,11 @@ class FleetColumn:
         self.ships = ships
 
     def add_ship(self, ship: Ship, position: int):
+        """
+
+        :param ship:
+        :param position:
+        """
         self.ships.append((ship, position))
 
         self.ships.sort(
@@ -35,7 +57,13 @@ class FleetColumn:
         )
 
     @classmethod
-    def from_string(cls, string):
+    def from_string(cls, string: str):
+        """
+
+        :param string:
+        :rtype: FleetColumn
+        :return:
+        """
         split_list = string.split('\n')
 
         if len(split_list) == 1:
@@ -55,7 +83,7 @@ class FleetColumn:
         for ship in ships.split(': ')[1].split(','):
             if ship == '':
                 continue
-            
+
             ship_list.append((Ship.from_str(ship), position))
             position += 1
 
@@ -71,7 +99,7 @@ class FleetColumn:
         if other.combat_column != self.combat_column:
             return False
 
-        if (len(self.ships) != len(other.ships)):
+        if len(self.ships) != len(other.ships):
             return False
 
         for i, ship in enumerate(self.ships):
@@ -81,16 +109,21 @@ class FleetColumn:
 
         return True
 
-class Position:
 
-    def __init__(self, combat_column: CombatColumn, position: int):
-        self.combat_column = combat_column
-        self.position = position
+class FleetList:
+    """
+    Fleet list encapsulation
+    """
 
-
-class FleetList(object):
-
-    def __init__(self, columns: tuple[FleetColumn, FleetColumn, FleetColumn, FleetColumn, FleetColumn] = None):
+    def __init__(self,
+                 columns: tuple[
+                     FleetColumn,
+                     FleetColumn,
+                     FleetColumn,
+                     FleetColumn,
+                     FleetColumn
+                 ] = None
+                 ):
         if columns is None:
             columns = (
                 FleetColumn(1),
@@ -126,7 +159,7 @@ class FleetList(object):
 
             ship = Ship(
                 current_health=int(match.group(2)),
-                ship_type=ShipType.ToEnum(match.group(1))
+                ship_type=ShipType.from_str(match.group(1))
             )
 
             (column_num, position) = (int(match.group(3)), int(match.group(4)))
@@ -138,4 +171,9 @@ class FleetList(object):
         return FleetList(columns)
 
     def where_column(self, combat_column: CombatColumn) -> list[FleetColumn]:
+        """
+
+        :param combat_column:
+        :return:
+        """
         return list(filter(lambda x: x.combat_column == combat_column, self.columns))

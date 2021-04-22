@@ -1,10 +1,17 @@
+"""
+Ship module
+"""
+
 import enum
 import re
 
-fleet_ship_regex = re.compile('`(.+) \((\\d+)/\\d+\)`')
+fleet_ship_regex = re.compile('`(.+) \\((\\d+)/\\d+\\)`')
 
 
 class ShipType(enum.Enum):
+    """
+    Enum for the various ship types
+    """
     CRUISER = 'Cruiser'
     FIGHTER = 'Fighter'
 
@@ -17,7 +24,12 @@ class ShipType(enum.Enum):
         return str_rep[self]
 
     @classmethod
-    def from_str(cls, from_str):
+    def from_str(cls, from_str: str):
+        """
+
+        :param from_str:
+        :return:
+        """
         str_rep = {
             'Fighter': ShipType.FIGHTER,
             'Cruiser': ShipType.CRUISER,
@@ -25,8 +37,19 @@ class ShipType(enum.Enum):
 
         return str_rep[from_str]
 
+    @property
+    def max_health(self) -> int:
+        """
+        Gets the max health for this ship type
+        :return:
+        """
+        return 10
+
 
 class Ship:
+    """
+    Class to represent a ship
+    """
 
     def __init__(self, current_health: int, ship_type: ShipType):
         self.current_health = current_health
@@ -36,14 +59,25 @@ class Ship:
         return '{} ({}/{})'.format(
             self.ship_type,
             self.current_health,
-            self.max_health()
+            self.max_health
         )
 
-    def max_health(self):
-        return 10
+    @property
+    def max_health(self) -> int:
+        """
+        Proxies to the ship type enum's max health
+        :return:
+        """
+        return self.ship_type.max_health
 
     @classmethod
-    def from_str(cls, ship_str):
+    def from_str(cls, ship_str: str):
+        """
+
+        :param ship_str:
+        :rtype: Ship
+        :return:
+        """
         match = fleet_ship_regex.match(ship_str.strip())
 
         if not match:

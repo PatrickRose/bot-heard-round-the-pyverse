@@ -1,46 +1,54 @@
+'''
+Module holding the combat status content
+'''
+
 import enum
 import re
+from typing import Optional
 
 import discord
-import tabulate
 
-from bot_heard_round.CombatColumn import CombatColumn
-from bot_heard_round.Fleet import FleetList, Position
-from bot_heard_round.Ship import Ship
+from bot_heard_round.fleet import FleetList, CombatColumn
+from bot_heard_round.utils import get_user_from_nick_or_name
 
 attack_defend_regex = re.compile('(Attacker|Defender): `(.+)`')
 round_regex = re.compile('`!!! Combat status( - round (\\d)| - finished)? !!!`')
-fleet_list_regex = re.compile('(Attacker|Defender) ships to apply: (.+)')
 ship_regex = re.compile('`(.+?) \\((\\w+) (\\d+)/(\\d+)\\)`')
 
 
 class CombatRound(enum.Enum):
-    PENDING = 0,
-    MISSILE_ONE = 1,
-    MISSILE_TWO = 2,
+    '''
+    Enum for the different combat rounds
+    '''
+    PENDING = 0
+    MISSILE_ONE = 1
+    MISSILE_TWO = 2
     RAILGUN = 3
     FINISHED = 4
 
 
 class CombatStatus:
+    '''
+    Encapsulates the combat status for the current combat
+    '''
 
-    def __init__(self, attacker: discord.User,
-                 defender: discord.User,
-                 attacker_fleet: FleetList = None,
-                 defender_fleet: FleetList = None,
+    def __init__(self,
+                 attacker: (discord.User, FleetList),
+                 defender: (discord.User, FleetList),
                  combat_round=CombatRound.PENDING):
-        if attacker_fleet is None:
-            attacker_fleet = FleetList()
-        if defender_fleet is None:
-            defender_fleet = FleetList()
 
-        self.attacker = attacker
-        self.defender = defender
-        self.attacker_fleet = attacker_fleet
-        self.defender_fleet = defender_fleet
+        self.attacker = attacker[0]
+        self.defender = defender[1]
+        self.attacker_fleet = attacker[1] or FleetList()
+        self.defender_fleet = defender[1] or FleetList()
         self.combat_round = combat_round
 
     def add_fleet_for(self, user: discord.User, fleet: str):
+        """
+
+        :param user:
+        :param fleet:
+        """
         if user.id == self.attacker.id:
             self.attacker_fleet = FleetList.from_list(fleet)
         else:
@@ -100,22 +108,34 @@ class CombatStatus:
             attacker_fleet_ready.sort(key=lambda x: x[1].position, reverse=True)
             defender_fleet_ready.sort(key=lambda x: x[1].position)
 
-            rows.append(
-                '```\n' + tabulate.tabulate(
-                    [str(x[0]) for x in attacker_fleet_ready] + ['------'] + [str(x[0]) for x in defender_fleet_ready]
-                ) + '\n```'
-            )
+            # rows.append(
+            #     '```\n' + tabulate.tabulate(
+            #         [str(x[0]) for x in attacker_fleet_ready] +
+            #         ['------'] +
+            #         [str(x[0]) for x in defender_fleet_ready]
+            #     ) + '\n```'
+            # )
 
         return "\n".join(rows)
 
     def ready_for_combat(self):
-        return self.attacker_fleet.ships and self.defender_fleet.ships
+        """
+
+        :rtype: bool
+        """
+        return bool(self.attacker_fleet.ships and self.defender_fleet.ships)
 
     @classmethod
     async def from_message(cls, message: discord.Message):
+        """
+
+        :param message:
+        :return:
+        """
         content = message.content
-        attacker: discord.User
-        defender: discord.User
+        attacker: Optional[discord.User] = None
+        defender: Optional[discord.User] = None
+        combat_round = None
         defender_ships = FleetList()
         attacker_ships = FleetList()
 
@@ -125,48 +145,49 @@ class CombatStatus:
 
             match = round_regex.match(line)
             if match:
-                if match.group(2) is None:
-                    combat_round = CombatRound.PENDING if match.group(1) is None else CombatRound.FINISHED
-                else:
-                    combat_round = [
-                        'EMPTY',
-                        CombatRound.MISSILE_ONE,
-                        CombatRound.MISSILE_TWO,
-                        CombatRound.RAILGUN
-                    ][int(match.group(2))]
+                combat_round = cls.make_combat_round(match)
 
             match = attack_defend_regex.match(line)
 
             if match:
                 attack_defend = match.group(1)
-                name_nick = match.group(2)
-
-                user = discord.utils.get(members, nick=name_nick)
+                user = get_user_from_nick_or_name(match.group(2), members)
 
                 if not user:
-                    user = discord.utils.get(members, name=name_nick)
-
-                if not user:
-                    raise ValueError('Could not find user with name/nickname {}'.format(name_nick))
+                    raise ValueError(
+                        'Could not find user with name/nickname {}'.format(match.group(2))
+                    )
 
                 if attack_defend == 'Attacker':
                     attacker = user
                 else:
                     defender = user
 
-            match = fleet_list_regex.match(line)
+        if not attacker or defender:
+            raise ValueError('Missing an attacker or defender?')
 
-            if match:
-                attack_defend = match.group(1)
-                ships = match.group(2)
-                if attack_defend == 'Attacker':
-                    ship_list = attacker_ships
-                else:
-                    ship_list = defender_ships
+        return CombatStatus(
+            (attacker, attacker_ships),
+            (defender, defender_ships),
+            combat_round=combat_round
+        )
 
-                for group in ship_regex.finditer(ships):
-                    ship = Ship(name=group[1], ship_type=group[2], current_health=group[3], max_health=group[4])
+    @classmethod
+    def make_combat_round(cls, match: re) -> CombatRound:
+        """
 
-                    ship_list.add_ship(ship, Position(CombatColumn.WAITING, -1))
-
-        return CombatStatus(attacker, defender, attacker_ships, defender_ships, combat_round=combat_round)
+        :param match:
+        :return:
+        """
+        if match.group(2) is None:
+            combat_round = CombatRound.PENDING \
+                if match.group(1) is None \
+                else CombatRound.FINISHED
+        else:
+            combat_round = [
+                'EMPTY',
+                CombatRound.MISSILE_ONE,
+                CombatRound.MISSILE_TWO,
+                CombatRound.RAILGUN
+            ][int(match.group(2))]
+        return combat_round
