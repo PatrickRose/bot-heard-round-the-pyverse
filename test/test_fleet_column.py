@@ -80,8 +80,8 @@ class FleetColumnTestCase(unittest.TestCase):
         """
         Test we can create a fleet from a string
         """
-        fighter = Ship(10, ShipType.FIGHTER)
-        cruiser = Ship(10, ShipType.CRUISER)
+        frigate = Ship(10, ShipType.FRIGATE)
+        cruiser = Ship(10, ShipType.LIGHT_CRUISER)
 
         test_cases = [
             (FleetColumn(1), 'Fleet column 1'),
@@ -91,8 +91,8 @@ class FleetColumnTestCase(unittest.TestCase):
                 f'Fleet column 1\nShips: `{cruiser}`'
             ),
             (
-                FleetColumn(1, ships=[(cruiser, 0), (fighter, 1)]),
-                f'Fleet column 1\nShips: `{cruiser}`, `{fighter}`'
+                FleetColumn(1, ships=[(cruiser, 0), (frigate, 1)]),
+                f'Fleet column 1\nShips: `{cruiser}`, `{frigate}`'
             )
         ]
 
@@ -108,11 +108,11 @@ class FleetColumnTestCase(unittest.TestCase):
         """
         Test equality method
         """
-        fighter = Ship(10, ShipType.FIGHTER)
-        cruiser = Ship(10, ShipType.CRUISER)
+        fighter = Ship(10, ShipType.FRIGATE)
+        cruiser = Ship(10, ShipType.LIGHT_CRUISER)
 
-        damaged_fighter = Ship(3, ShipType.FIGHTER)
-        damaged_cruiser = Ship(3, ShipType.CRUISER)
+        damaged_fighter = Ship(3, ShipType.FRIGATE)
+        damaged_cruiser = Ship(3, ShipType.LIGHT_CRUISER)
 
         test_cases = [
             (

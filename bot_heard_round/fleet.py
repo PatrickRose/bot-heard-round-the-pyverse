@@ -7,7 +7,7 @@ import re
 
 from bot_heard_round.ship import Ship, ShipType
 
-add_fleet_ship_regex = re.compile('(.)(\\d+)\\[(\\d+),(\\d+)]')
+add_fleet_ship_regex = re.compile('(.+?)(\\d+)\\[(\\d+),(\\d+)]')
 fleet_column_regex = re.compile('Fleet column (\\d+)')
 
 
