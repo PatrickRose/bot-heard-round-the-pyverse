@@ -7,9 +7,11 @@ import re
 from typing import Optional
 
 import discord
+import tabulate
 from discord import WidgetMember
 
-from bot_heard_round.fleet import FleetList, CombatColumn
+from bot_heard_round.fleet import FleetList, CombatColumn, FleetColumn
+from bot_heard_round.ship import Ship
 from bot_heard_round.utils import get_user_from_nick_or_name
 
 attack_defend_regex = re.compile('(Attacker|Defender): `(.+)`')
@@ -38,11 +40,13 @@ class CombatStatus:
     attacker_fleet: FleetList
     defender: WidgetMember
     defender_fleet: FleetList
+    message: discord.Message
 
     def __init__(self,
                  attacker,
                  defender,
-                 combat_round: CombatRound = CombatRound.PENDING):
+                 combat_round: CombatRound = CombatRound.PENDING,
+                 message: discord.Message = None):
         if not isinstance(attacker, tuple):
             attacker = (attacker, FleetList())
         if not isinstance(defender, tuple):
@@ -54,13 +58,16 @@ class CombatStatus:
         self.defender_fleet = defender[1]
         self.combat_round = combat_round
 
-    def add_fleet_for(self, user: discord.WidgetMember, fleet: str):
+        if message:
+            self.message = message
+
+    def add_fleet_for(self, for_attacker: bool, fleet: str):
         """
 
-        :param user:
+        :param for_attacker:
         :param fleet:
         """
-        if user.id == self.attacker.id:
+        if for_attacker:
             self.attacker_fleet = FleetList.from_str(fleet)
         else:
             self.defender_fleet = FleetList.from_str(fleet)
@@ -70,7 +77,6 @@ class CombatStatus:
         defender = self.defender.display_name
 
         attacker_fleet_waiting = self.attacker_fleet.where_column(CombatColumn.WAITING)
-
         defender_fleet_waiting = self.defender_fleet.where_column(CombatColumn.WAITING)
 
         attacker_fleet_waiting.sort(
@@ -112,20 +118,102 @@ class CombatStatus:
                 )
             )
 
-        attacker_fleet_ready = self.attacker_fleet.where_column(CombatColumn.MIDDLE)
-        defender_fleet_ready = self.defender_fleet.where_column(CombatColumn.MIDDLE)
+        attacker_fleet_activated: dict[CombatColumn, list[tuple[Ship, int]]] = {}
+        defender_fleet_activated: dict[CombatColumn, list[tuple[Ship, int]]] = {}
 
-        if attacker_fleet_ready or defender_fleet_ready:
-            attacker_fleet_ready.sort(key=lambda x: x[1].position, reverse=True)
-            defender_fleet_ready.sort(key=lambda x: x[1].position)
+        for column in CombatColumn:
+            if column == CombatColumn.WAITING:
+                continue
 
-            # rows.append(
-            #     '```\n' + tabulate.tabulate(
-            #         [str(x[0]) for x in attacker_fleet_ready] +
-            #         ['------'] +
-            #         [str(x[0]) for x in defender_fleet_ready]
-            #     ) + '\n```'
-            # )
+            attacker = self.attacker_fleet.where_column(column)
+
+            if not attacker:
+                attacker = FleetColumn(-1)
+            else:
+                attacker = attacker[0]
+
+            attacker_fleet_activated[column] = attacker.ships
+
+            defender = self.defender_fleet.where_column(column)
+
+            if not defender:
+                defender = FleetColumn(-1)
+            else:
+                defender = defender[0]
+
+            defender_fleet_activated[column] = defender.ships
+
+        ship_table = []
+
+        for i_attacker_pos in range(
+                max(len(attacker_fleet_activated[x]) for x in attacker_fleet_activated),
+                0,
+                -1
+        ):
+            if i_attacker_pos > len(attacker_fleet_activated[CombatColumn.LEFT]):
+                left = ''
+            else:
+                left = str(attacker_fleet_activated[CombatColumn.LEFT][i_attacker_pos - 1][0])
+
+            if i_attacker_pos > len(attacker_fleet_activated[CombatColumn.MIDDLE]):
+                middle = ''
+            else:
+                middle = str(attacker_fleet_activated[CombatColumn.MIDDLE][i_attacker_pos - 1][0])
+
+            if i_attacker_pos > len(attacker_fleet_activated[CombatColumn.RIGHT]):
+                right = ''
+            else:
+                right = str(attacker_fleet_activated[CombatColumn.RIGHT][i_attacker_pos - 1][0])
+
+            ship_table.append({
+                CombatColumn.LEFT: left,
+                CombatColumn.MIDDLE: middle,
+                CombatColumn.RIGHT: right
+            })
+
+            i_attacker_pos -= 1
+
+        ship_table.append({
+            CombatColumn.LEFT: '-----',
+            CombatColumn.MIDDLE: '-----',
+            CombatColumn.RIGHT: '-----'
+        })
+
+        for i in range(max(len(defender_fleet_activated[x]) for x in defender_fleet_activated)):
+            if i >= len(defender_fleet_activated[CombatColumn.LEFT]):
+                left = ''
+            else:
+                left = str(defender_fleet_activated[CombatColumn.LEFT][i][0])
+
+            if i >= len(defender_fleet_activated[CombatColumn.MIDDLE]):
+                middle = ''
+            else:
+                middle = str(defender_fleet_activated[CombatColumn.MIDDLE][i][0])
+
+            if i >= len(defender_fleet_activated[CombatColumn.RIGHT]):
+                right = ''
+            else:
+                right = str(defender_fleet_activated[CombatColumn.RIGHT][i][0])
+
+            ship_table.append({
+                CombatColumn.LEFT: left,
+                CombatColumn.MIDDLE: middle,
+                CombatColumn.RIGHT: right
+            })
+
+        if len(ship_table) != 1:
+            rows.append(
+                '```\n' + tabulate.tabulate(
+                    ship_table,
+                    headers={
+                        CombatColumn.LEFT: 'Left',
+                        CombatColumn.MIDDLE: 'Middle',
+                        CombatColumn.RIGHT: 'Right',
+                    },
+                    tablefmt='github',
+                    stralign='center'
+                ) + '\n```'
+            )
 
         return "\n".join(rows)
 
@@ -214,3 +302,97 @@ class CombatStatus:
                 CombatRound.RAIL_GUN
             ][int(match.group(2))]
         return combat_round
+
+    async def send_message(self, channel: discord.TextChannel):
+        """
+        Send the message to the given channel
+        :param channel:
+        :return:
+        """
+        message = await channel.send(str(self))
+        self.message = message
+
+        return message
+
+    async def update_message(self):
+        """
+        Update the current message
+        :return:
+        """
+        await self.message.edit(content=str(self))
+
+    def resolve_combat_round(self):
+        """
+        Resolves the current combat round
+        :return: list[Str]
+        """
+        messages = []
+
+        for combat_column in CombatColumn.active_columns():
+            lines = ['PROCESSING {}'.format(combat_column.value)]
+
+            attacker_ships = self.attacker_fleet.where_column(combat_column)
+            defender_ships = self.defender_fleet.where_column(combat_column)
+
+            if attacker_ships:
+                attacker_ships = attacker_ships[0]
+            else:
+                attacker_ships = FleetColumn(-1)
+
+            if defender_ships:
+                defender_ships = defender_ships[0]
+            else:
+                defender_ships = FleetColumn(-1)
+
+            attacker_attack = attacker_ships.attack
+            defender_attack = defender_ships.attack
+
+            if self.combat_round == CombatRound.RAIL_GUN:
+                attacker_defence = 0
+                defender_defence = 0
+            else:
+                attacker_defence = attacker_ships.defence
+                defender_defence = defender_ships.defence
+
+            lines.append(
+                'Attacker has `{}` attack and `{}` defence'.format(
+                    attacker_attack,
+                    attacker_defence
+                )
+            )
+            lines.append(
+                'Defender has `{}` attack and `{}` defence'.format(
+                    defender_attack,
+                    defender_defence
+                )
+            )
+
+            if attacker_attack > defender_defence:
+                damage = attacker_attack - defender_defence
+                lines.append('Attacker deals `{}` damage to defender'.format(damage))
+
+                carry_over, new_lines = defender_ships.take_damage(damage)
+                lines += new_lines
+
+                if carry_over > 0:
+                    lines.append('{} CARRY OVER DAMAGE HITS WAITING FLEETS'.format(carry_over))
+                    for fleet in self.defender_fleet.where_column(CombatColumn.WAITING):
+                        _, new_lines = fleet.take_damage(carry_over)
+                        lines += new_lines
+
+            if defender_attack > attacker_defence:
+                damage = defender_attack - attacker_defence
+                lines.append('Defender deals `{}` damage to attacker'.format(damage))
+
+                carry_over, new_lines = attacker_ships.take_damage(damage)
+                lines += new_lines
+
+                if carry_over > 0:
+                    lines.append('{} CARRY OVER DAMAGE HITS WAITING FLEETS'.format(carry_over))
+                    for fleet in self.attacker_fleet.where_column(CombatColumn.WAITING):
+                        _, new_lines = fleet.take_damage(carry_over)
+                        lines += new_lines
+
+            messages.append('\n'.join(lines))
+
+        return messages

@@ -6,11 +6,22 @@ import os
 import random
 
 import discord
+import emoji
 from discord.ext import commands
 from dotenv import load_dotenv
 
 from bot_heard_round.combat_status import CombatRound, CombatStatus
-from bot_heard_round.fleet import CombatColumn
+from bot_heard_round.fleet import CombatColumn, FleetList
+
+ONE_EMOJI = emoji.emojize(':one:', use_aliases=True)
+TWO_EMOJI = emoji.emojize(':two:', use_aliases=True)
+THREE_EMOJI = emoji.emojize(':three:', use_aliases=True)
+FOUR_EMOJI = emoji.emojize(':four:', use_aliases=True)
+FIVE_EMOJI = emoji.emojize(':five:', use_aliases=True)
+
+LEFT_EMOJI = emoji.emojize(':regional_indicator_l:', use_aliases=True)
+CENTRE_EMOJI = emoji.emojize(':regional_indicator_c:', use_aliases=True)
+RIGHT_EMOJI = emoji.emojize(':regional_indicator_r:', use_aliases=True)
 
 intents = discord.Intents.default()
 intents.members = True
@@ -122,17 +133,64 @@ async def start_combat(ctx: commands.context.Context, target: str):
 
     combat_status = CombatStatus(attacker, defender)
 
-    status = await channel.send(str(combat_status))
+    status = await combat_status.send_message(channel)
     await status.pin()
 
     await channel.send(
         'Combat started, {} attacks {}\n'
-        'Please use the `{}fleet-list` command to import your fleet'.format(
+        '{} copy your `fleet-list` from your spreadsheet to import your fleet'.format(
             attacker.mention,
             defender.mention,
-            COMMAND_PREFIX
+            attacker.mention
         )
     )
+
+    def check_for_message(author):
+        def check(message: discord.Message):
+            if message.channel != channel:
+                return False
+
+            if message.author != author:
+                return False
+
+            content = message.content
+
+            try:
+                FleetList.from_str(content)
+                return True
+            except ValueError as e:
+                print(e)
+                return False
+
+        return check
+
+    attacker_fleet_msg = await bot.wait_for(
+        'message',
+        check=check_for_message(attacker)
+    )
+
+    await attacker_fleet_msg.reply('Importing fleet now...')
+    combat_status.add_fleet_for(True, attacker_fleet_msg.content)
+
+    await combat_status.update_message()
+
+    await channel.send(
+        '{} copy your `fleet-list` from your spreadsheet to import your fleet'.format(
+            defender.mention
+        )
+    )
+
+    defender_fleet_msg = await bot.wait_for(
+        'message',
+        check=check_for_message(defender)
+    )
+
+    await defender_fleet_msg.reply('Importing fleet now...')
+
+    combat_status.add_fleet_for(False, defender_fleet_msg.content)
+    await combat_status.update_message()
+
+    await start_combat_loop(combat_status)
 
 
 @bot.command(
@@ -162,157 +220,165 @@ async def clear_combat(ctx: commands.context.Context):
     await ctx.reply('Done!')
 
 
-async def combat_status_from_context(ctx: commands.context.Context):
-    """
+def reaction_check(message, expected_user, valid_reactions):
+    def check_activated(reaction, user):
+        return reaction.message == message \
+               and reaction.emoji in valid_reactions \
+               and user == expected_user
 
-    :param ctx:
-    :return:
-    """
-    channel: discord.TextChannel = ctx.channel
-    pins = await channel.pins()
-    if not pins:
-        raise ValueError('No pinned message found, did you run this in a combat channel?')
-    message: discord.Message = pins[0]
-
-    return (message, await CombatStatus.from_message(message))
+    return check_activated
 
 
-@bot.command(name='fleet-list')
-async def add_fleet_list(ctx: commands.context.Context, fleet_list: str):
-    """
-
-    :param ctx:
-    :param fleet_list:
-    :return:
-    """
-    try:
-        message, combat_status = await combat_status_from_context(ctx)
-    except ValueError as error:
-        await ctx.reply(
-            '{} - tag `@{}` if you need help'.format(
-                error.args[0],
-                BOT_MASTER_ROLE
-            )
-        )
-        return
-
-    # if combat_status.combat_round != CombatRound.PENDING:
-    #     await ctx.reply(
-    #         'Combat has started! You can\'t change your fleet!'
-    #     )
-    #     return
-
-    user = ctx.author
-
-    combat_status.add_fleet_for(user, fleet_list)
-
-    await message.edit(content=combat_status)
-
-    await ctx.reply('Added your ships to the list')
-
-    if combat_status.ready_for_combat():
-        await start_combat_loop(message, combat_status)
-
-
-async def start_combat_loop(message: discord.Message, combat_status: CombatStatus):
-    """
-
-    :param message:
-    :param combat_status:
-    :return:
-    """
-    channel = message.channel
-
-    combat_status.combat_round = CombatRound.MISSILE_ONE
-
-    await message.edit(content=combat_status)
-
-    await channel.send('COMBAT HAS STARTED!')
-
-    react_message: discord.Message = await channel.send(
-        'React to this message with :crossed_swords: to fight, or with :flag_white: to retreat')
-
-    for emoji in ['⚔', '🏳']:
-        await react_message.add_reaction(emoji)
-
-    def check_react(user_to_check):
-        def tmp(reaction, user):
-            return reaction.message == react_message and \
-                   reaction.emoji in ['⚔', '🏳'] and \
-                   user == user_to_check
-
-        return tmp
-
-    attack_react = await bot.wait_for(
-        'reaction_add',
-        check=check_react(combat_status.attacker)
-    )
-    defend_react = await bot.wait_for(
-        'reaction_add',
-        check=check_react(combat_status.defender)
-    )
-
-    if '⚔' not in [attack_react[0].emoji, defend_react[0].emoji]:
-        combat_status.combat_round = CombatRound.FINISHED
-        await message.edit(content=combat_status)
-        await channel.send('Both players have retreated, combat finished')
-        return
-
-    await channel.send('Combat will continue for another round')
+async def request_ships(combat_status: CombatStatus, apply_attackers: bool):
+    channel: discord.TextChannel = combat_status.message.channel
+    user_to_respond = combat_status.attacker if apply_attackers else combat_status.defender
+    fleet = combat_status.attacker_fleet if apply_attackers else combat_status.defender_fleet
 
     ship_list = {}
     ship_text = []
 
     possible_emojis = [
-        '🤖', '👽', '👻'
+        ONE_EMOJI,
+        TWO_EMOJI,
+        THREE_EMOJI,
+        FOUR_EMOJI,
+        FIVE_EMOJI,
     ]
 
-    for ship in combat_status.attacker_fleet.where_column(CombatColumn.WAITING):
-        emoji = possible_emojis[len(ship_list)]
-        ship_list[emoji] = ship[0]
-        ship_text.append("{}: {}".format(emoji, str(ship[0])))
+    for fleet_column in fleet.where_column(CombatColumn.WAITING):
+        if not fleet_column.ships:
+            continue
 
-    ## Ask the attacker to add 3 ships
-    attacker_ships_message = await channel.send(
-        "{}, please react to this with the ships you want to add."
-        "Choose 🚫 to stop adding\n{}".format(
-            combat_status.attacker.mention,
+        emoji_to_send = possible_emojis[fleet_column.column_number - 1]
+
+        ship_list[emoji_to_send] = fleet_column
+        ship_text.append(
+            "{}: Column {}: {}".format(emoji_to_send, fleet_column.column_number, fleet_column.ships_as_str))
+
+    if not ship_text:
+        await channel.send('No unassigned ships left in fleet, skipping {}'.format(user_to_respond.display_name))
+        return
+
+    ships_message = await channel.send(
+        "{}, please react to this with the ships you want to add.\n{}".format(
+            user_to_respond.mention,
             "\n".join(ship_text)
         )
     )
 
-    await attacker_ships_message.add_reaction('🚫')
+    for emoji_to_send in ship_list:
+        await ships_message.add_reaction(emoji_to_send)
 
-    for emoji in ship_list:
-        await attacker_ships_message.add_reaction(emoji)
-
-    def check_activated(reaction, user):
-        return reaction.message == attacker_ships_message \
-               and (reaction.emoji == '🚫' or reaction.emoji in ship_list) \
-               and user == combat_status.attacker
-
-    activated = [
-        await bot.wait_for(
-            'reaction_add',
-            check=check_activated
-        ),
-        await bot.wait_for(
-            'reaction_add',
-            check=check_activated
-        ),
-        await bot.wait_for(
-            'reaction_add',
-            check=check_activated
+    reaction, _ = await bot.wait_for(
+        'reaction_add',
+        check=reaction_check(
+            ships_message,
+            user_to_respond,
+            ship_list
         )
-    ]
+    )
 
-    for ship in activated:
-        emoji = ship[0].emoji
-        if emoji in ship_list:
-            combat_status.attacker_fleet.move_ship(ship_list[emoji], CombatColumn.MIDDLE)
-            await channel.send('Moving ship {}'.format(str(ship_list[emoji])))
+    fleet_column = ship_list[reaction.emoji]
 
-    await message.edit(content=combat_status)
+    column_message = await channel.send(
+        "{}, please react to this with which column you want to add fleet column {} to".format(
+            user_to_respond.mention,
+            fleet_column.column_number
+        )
+    )
+
+    columns = {
+        LEFT_EMOJI: CombatColumn.LEFT,
+        CENTRE_EMOJI: CombatColumn.MIDDLE,
+        RIGHT_EMOJI: CombatColumn.RIGHT
+    }
+
+    for emoji_to_send in columns:
+        if fleet.where_column(columns[emoji_to_send]):
+            continue
+
+        await column_message.add_reaction(emoji_to_send)
+
+    reaction, _ = await bot.wait_for(
+        'reaction_add',
+        check=reaction_check(
+            column_message,
+            user_to_respond,
+            columns
+        )
+    )
+
+    await channel.send(
+        "Moving fleet {} to column {}".format(
+            fleet_column.column_number,
+            columns[reaction.emoji].value
+        )
+    )
+
+    fleet_column.combat_column = columns[reaction.emoji]
+
+    await combat_status.update_message()
+
+
+async def start_combat_loop(combat_status: CombatStatus):
+    """
+
+    :param combat_status:
+    :return:
+    """
+    channel: discord.TextChannel = combat_status.message.channel
+
+    messages = {
+        CombatRound.MISSILE_ONE: 'COMBAT HAS STARTED!',
+        CombatRound.MISSILE_TWO: 'Second round of combat',
+        CombatRound.RAIL_GUN: 'Final combat round. ALL DEFENCE WILL BE ZERO THIS ROUND',
+    }
+
+    for combat_round in messages:
+        combat_status.combat_round = combat_round
+        await combat_status.update_message()
+
+        await channel.send(messages[combat_round])
+
+        react_message: discord.Message = await channel.send(
+            'React to this message with :crossed_swords: to fight, or with :flag_white: to retreat'
+        )
+
+        for combat_emoji in ['⚔', '🏳']:
+            await react_message.add_reaction(combat_emoji)
+
+        attack_react, _ = await bot.wait_for(
+            'reaction_add',
+            check=reaction_check(react_message, combat_status.attacker, ['⚔', '🏳'])
+        )
+        defend_react, _ = await bot.wait_for(
+            'reaction_add',
+            check=reaction_check(react_message, combat_status.defender, ['⚔', '🏳'])
+        )
+
+        if '⚔' not in [attack_react.emoji, defend_react.emoji]:
+            combat_status.combat_round = CombatRound.FINISHED
+            await combat_status.update_message()
+            await channel.send('Both players have retreated, combat finished')
+            return
+
+        await channel.send('Combat will continue for another round')
+
+        if combat_status.combat_round == CombatRound.MISSILE_ONE:
+            apply_order = [
+                True,
+                False,
+                False,
+                True,
+                True,
+                False
+            ]
+
+            for apply_attacker_ships in apply_order:
+                await request_ships(combat_status, apply_attacker_ships)
+
+        for message in combat_status.resolve_combat_round():
+            await channel.send(message)
 
 
 bot.run(TOKEN)

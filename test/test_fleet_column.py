@@ -163,6 +163,40 @@ class FleetColumnTestCase(unittest.TestCase):
             with self.subTest(first=second, second=first):
                 self.assertEqual(result, second == first)
 
+    def test_taking_damage(self):
+        test_cases = [
+            (
+                FleetColumn(-1, ships=[(Ship(10, ShipType.FRIGATE), 0)]),
+                5,
+                FleetColumn(-1, ships=[(Ship(5, ShipType.FRIGATE), 0)]),
+                0
+            ),
+            (
+                FleetColumn(-1, ships=[(Ship(10, ShipType.FRIGATE), 0)]),
+                10,
+                FleetColumn(-1, ships=[]),
+                0
+            ),
+            (
+                FleetColumn(-1, ships=[(Ship(10, ShipType.FRIGATE), 0)]),
+                15,
+                FleetColumn(-1, ships=[]),
+                5
+            ),
+            (
+                FleetColumn(-1, ships=[(Ship(10, ShipType.FRIGATE), 0), (Ship(10, ShipType.FRIGATE), 1)]),
+                15,
+                FleetColumn(-1, ships=[(Ship(5, ShipType.FRIGATE), 1)]),
+                0
+            ),
+        ]
+
+        for base, damage, expected, carry_over in test_cases:
+            with self.subTest():
+                actual_carry, _ = base.take_damage(damage)
+                self.assertEqual(base, expected)
+                self.assertEqual(carry_over, actual_carry)
+
 
 if __name__ == '__main__':
     unittest.main()

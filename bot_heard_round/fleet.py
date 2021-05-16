@@ -16,10 +16,21 @@ class CombatColumn(enum.Enum):
     Enum for the different combat columns
     """
     WAITING = 'waiting'
-    LEFT = 'left'
-    MIDDLE = 'middle'
-    RIGHT = 'right'
+    LEFT = 'Left'
+    MIDDLE = 'Middle'
+    RIGHT = 'Right'
 
+    @classmethod
+    def active_columns(cls):
+        """
+
+        :rtype: list[CombatColumn]
+        """
+        return [
+            cls.LEFT,
+            cls.MIDDLE,
+            cls.RIGHT,
+        ]
 
 class FleetColumn:
     """
@@ -38,6 +49,14 @@ class FleetColumn:
         self.combat_column = combat_column
         self.ships = ships
 
+    @property
+    def defence(self):
+        return sum([x[0].defence for x in self.ships])
+
+    @property
+    def attack(self):
+        return sum([x[0].attack for x in self.ships])
+
     def add_ship(self, ship: Ship, position: int):
         """
 
@@ -53,8 +72,12 @@ class FleetColumn:
     def __str__(self):
         return 'Fleet column {}\nShips: {}'.format(
             self.column_number,
-            ', '.join(['`{}`'.format(x[0]) for x in self.ships])
+            self.ships_as_str
         )
+
+    @property
+    def ships_as_str(self):
+        return ', '.join(['`{}`'.format(x[0]) for x in self.ships])
 
     @classmethod
     def from_string(cls, string: str):
@@ -108,6 +131,25 @@ class FleetColumn:
                 return False
 
         return True
+
+    def take_damage(self, damage):
+        message = []
+
+        while damage > 0:
+            if not self.ships:
+                break
+
+            ship = self.ships[0]
+            if damage >= ship[0].current_health:
+                damage -= ship[0].current_health
+                message.append("{} is destroyed!".format(ship[0]))
+                self.ships.remove(ship)
+            else:
+                message.append("{} takes {} damage".format(ship[0], damage))
+                ship[0].current_health -= damage
+                damage = 0
+
+        return damage, message
 
 
 class FleetList:
@@ -186,3 +228,6 @@ class FleetList:
             return False
 
         return self.columns == other.columns
+
+    def __str__(self):
+        return '\n'.join([str(x) for x in self.columns])
