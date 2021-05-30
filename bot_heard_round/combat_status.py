@@ -327,6 +327,7 @@ class CombatStatus:
         :return: list[Str]
         """
         messages = []
+        carry_over = []
 
         for combat_column in CombatColumn.active_columns():
             lines = ['PROCESSING {}'.format(combat_column.value)]
@@ -369,34 +370,50 @@ class CombatStatus:
                 )
             )
 
-            if attacker_attack > defender_defence:
-                damage = attacker_attack - defender_defence
-                lines.append('Attacker deals `{}` damage to defender'.format(damage))
+            new_lines, new_carry_over = self.run_combat_damage(attacker_attack, defender_defence, defender_ships,
+                                                               self.defender_fleet,
+                                                               combat_column)
+            lines += new_lines
+            carry_over += new_carry_over
 
-                carry_over, new_lines = defender_ships.take_damage(damage)
+            new_lines, new_carry_over = self.run_combat_damage(defender_attack, attacker_defence, attacker_ships,
+                                                               self.attacker_fleet,
+                                                               combat_column)
+            lines += new_lines
+            carry_over += new_carry_over
+
+            messages.append('\n'.join(lines))
+
+        for damage, fleets, combat_column, dealer in carry_over:
+            lines = []
+            for ships in fleets:
+                lines.append('{} deals {} carry over damage to {}'.format(dealer, damage, combat_column.value))
+                _, new_lines = ships.take_damage(damage)
                 lines += new_lines
-
-                if carry_over > 0:
-                    ## TODO: Hit adjacent columns
-                    lines.append('{} CARRY OVER DAMAGE HITS WAITING FLEETS'.format(carry_over))
-                    for fleet in self.defender_fleet.where_column(CombatColumn.WAITING):
-                        _, new_lines = fleet.take_damage(carry_over)
-                        lines += new_lines
-
-            if defender_attack > attacker_defence:
-                damage = defender_attack - attacker_defence
-                lines.append('Defender deals `{}` damage to attacker'.format(damage))
-
-                carry_over, new_lines = attacker_ships.take_damage(damage)
-                lines += new_lines
-
-                if carry_over > 0:
-                    ## TODO: Hit adjacent columns
-                    lines.append('{} CARRY OVER DAMAGE HITS WAITING FLEETS'.format(carry_over))
-                    for fleet in self.attacker_fleet.where_column(CombatColumn.WAITING):
-                        _, new_lines = fleet.take_damage(carry_over)
-                        lines += new_lines
 
             messages.append('\n'.join(lines))
 
         return messages
+
+    def run_combat_damage(self, attack: int, defence: int, ships: FleetColumn, fleet: FleetList,
+                          combat_column: CombatColumn) -> (
+    list[str], list[tuple[int, list[FleetColumn]], CombatColumn, str]):
+        damage_dealer = 'Attacker' if self.defender_fleet == fleet else 'Defender'
+        damage_taker = 'defender' if self.defender_fleet == fleet else 'attacker'
+        lines = []
+        carry_over_damage = []
+
+        if attack > defence:
+            damage = attack - defence
+            lines.append('{} deals `{}` damage to {}'.format(damage_dealer, damage, damage_taker))
+            carry_over, new_lines = ships.take_damage(damage)
+            lines += new_lines
+
+            if carry_over > 0:
+                lines.append('{} CARRY OVER DAMAGE WILL HIT ADJACENT FLEETS'.format(carry_over))
+
+                for column in CombatColumn.adjacent_columns(combat_column):
+                    lines.append('{} will take {} damage'.format(column.value, carry_over))
+                    carry_over_damage.append((carry_over, fleet.where_column(column), combat_column, damage_dealer))
+
+        return lines, carry_over_damage

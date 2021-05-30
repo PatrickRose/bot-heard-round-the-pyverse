@@ -21,6 +21,14 @@ class CombatColumn(enum.Enum):
     RIGHT = 'Right'
 
     @classmethod
+    def adjacent_columns(cls, column):
+        return {
+            CombatColumn.RIGHT: [CombatColumn.MIDDLE],
+            CombatColumn.MIDDLE: [CombatColumn.LEFT, CombatColumn.RIGHT],
+            CombatColumn.LEFT: [CombatColumn.MIDDLE],
+        }[column]
+
+    @classmethod
     def active_columns(cls):
         """
 
