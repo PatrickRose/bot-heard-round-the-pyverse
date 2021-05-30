@@ -22,6 +22,10 @@ class CombatColumn(enum.Enum):
 
     @classmethod
     def adjacent_columns(cls, column):
+        """
+
+        :rtype: list[CombatColumn]
+        """
         return {
             CombatColumn.RIGHT: [CombatColumn.MIDDLE],
             CombatColumn.MIDDLE: [CombatColumn.LEFT, CombatColumn.RIGHT],
@@ -59,10 +63,18 @@ class FleetColumn:
 
     @property
     def defence(self):
+        """
+
+        :rtype: int
+        """
         return sum([x[0].defence for x in self.ships])
 
     @property
     def attack(self):
+        """
+
+        :rtype: int
+        """
         return sum([x[0].attack for x in self.ships])
 
     def add_ship(self, ship: Ship, position: int):
@@ -85,6 +97,10 @@ class FleetColumn:
 
     @property
     def ships_as_str(self):
+        """
+
+        :rtype: str
+        """
         return ', '.join(['`{}`'.format(x[0]) for x in self.ships])
 
     @classmethod
@@ -141,6 +157,10 @@ class FleetColumn:
         return True
 
     def take_damage(self, damage):
+        """
+
+        :rtype: tuple[int, str]
+        """
         message = []
 
         while damage > 0:

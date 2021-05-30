@@ -158,8 +158,8 @@ async def start_combat(ctx: commands.context.Context, target: str):
             try:
                 FleetList.from_str(content)
                 return True
-            except ValueError as e:
-                print(e)
+            except ValueError as error:
+                print(error)
                 return False
 
         return check
@@ -172,7 +172,7 @@ async def start_combat(ctx: commands.context.Context, target: str):
     await attacker_fleet_msg.reply('Importing fleet now...')
     combat_status.add_fleet_for(True, attacker_fleet_msg.content)
 
-    ## TODO: INCLUDE PATROL MODE HERE
+    # INCLUDE PATROL MODE HERE
 
     await combat_status.update_message()
 
@@ -223,6 +223,11 @@ async def clear_combat(ctx: commands.context.Context):
 
 
 def reaction_check(message, expected_user, valid_reactions):
+    """
+
+    :rtype: function
+    """
+
     def check_activated(reaction, user):
         return reaction.message == message \
                and reaction.emoji in valid_reactions \
@@ -232,6 +237,12 @@ def reaction_check(message, expected_user, valid_reactions):
 
 
 async def request_ships(combat_status: CombatStatus, apply_attackers: bool):
+    """
+
+    :param combat_status:
+    :param apply_attackers:
+    :return:
+    """
     channel: discord.TextChannel = combat_status.message.channel
     user_to_respond = combat_status.attacker if apply_attackers else combat_status.defender
     fleet = combat_status.attacker_fleet if apply_attackers else combat_status.defender_fleet
@@ -255,10 +266,15 @@ async def request_ships(combat_status: CombatStatus, apply_attackers: bool):
 
         ship_list[emoji_to_send] = fleet_column
         ship_text.append(
-            "{}: Column {}: {}".format(emoji_to_send, fleet_column.column_number, fleet_column.ships_as_str))
+            "{}: Column {}: {}".format(emoji_to_send,
+                                       fleet_column.column_number,
+                                       fleet_column.ships_as_str
+                                       ))
 
     if not ship_text:
-        await channel.send('No unassigned ships left in fleet, skipping {}'.format(user_to_respond.display_name))
+        await channel.send(
+            'No unassigned ships left in fleet, skipping {}'.format(user_to_respond.display_name)
+        )
         return
 
     ships_message = await channel.send(
@@ -332,7 +348,8 @@ async def start_combat_loop(combat_status: CombatStatus):
 
     messages = {
         CombatRound.MISSILE_ONE: 'COMBAT HAS STARTED!',
-        CombatRound.MISSILE_TWO: 'Second round of combat. If nobody retreats Railgun combat will start!',
+        CombatRound.MISSILE_TWO:
+            'Second round of combat. If nobody retreats Railgun combat will start!',
         CombatRound.RAIL_GUN: 'Final combat round. ALL DEFENCE WILL BE ZERO THIS ROUND',
     }
 
@@ -340,7 +357,7 @@ async def start_combat_loop(combat_status: CombatStatus):
         combat_status.combat_round = combat_round
 
         if combat_round != CombatRound.MISSILE_ONE:
-            # TODO: Allow moving of combat columns
+            # Allow moving of combat columns
             pass
 
         await combat_status.update_message()

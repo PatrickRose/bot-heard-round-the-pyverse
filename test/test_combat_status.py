@@ -10,36 +10,74 @@ from bot_heard_round.ship import Ship, ShipType
 
 
 class TestCombatStatus(unittest.TestCase):
+    """
+    Tests for the combat status
+    """
+
     def test_combat_round_applies_damage(self):
+        """
+
+        :return:
+        """
         combat = CombatStatus(
             (
                 MagicMock(),
                 FleetList((
                     FleetColumn(1, CombatColumn.RIGHT,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0)
+                                ]),
                     FleetColumn(2, CombatColumn.MIDDLE,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0)
+                                ]),
                     FleetColumn(3, CombatColumn.LEFT,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0)
+                                ]),
                     FleetColumn(4, CombatColumn.WAITING,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0)
+                                ]),
                     FleetColumn(5, CombatColumn.WAITING,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0)
+                                ]),
                 ))
             ),
             (
                 MagicMock(),
                 FleetList((
                     FleetColumn(1, CombatColumn.RIGHT,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0)
+                                ]),
                     FleetColumn(2, CombatColumn.MIDDLE,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0)
+                                ]),
                     FleetColumn(3, CombatColumn.LEFT,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0)
+                                ]),
                     FleetColumn(4, CombatColumn.WAITING,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0)
+                                ]),
                     FleetColumn(5, CombatColumn.WAITING,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0)
+                                ]),
                 ))
             ),
             CombatRound.MISSILE_ONE
@@ -47,18 +85,26 @@ class TestCombatStatus(unittest.TestCase):
 
         message = combat.resolve_combat_round()
 
-        expected_fleet = FleetList((FleetColumn(1, CombatColumn.RIGHT, ships=[(Ship(6, ShipType.LIGHT_CRUISER), 0),
-                                                                              (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
-                                    FleetColumn(2, CombatColumn.MIDDLE, ships=[(Ship(6, ShipType.LIGHT_CRUISER), 0),
-                                                                               (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
-                                    FleetColumn(3, CombatColumn.LEFT, ships=[(Ship(6, ShipType.LIGHT_CRUISER), 0),
-                                                                             (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
-                                    FleetColumn(4, CombatColumn.WAITING, ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
-                                                                                (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
-                                    FleetColumn(5, CombatColumn.WAITING, ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
-                                                                                (
-                                                                                    Ship(10, ShipType.LIGHT_CRUISER),
-                                                                                    0)]),)
+        expected_fleet = FleetList((FleetColumn(1,
+                                                CombatColumn.RIGHT,
+                                                ships=[(Ship(6, ShipType.LIGHT_CRUISER), 0),
+                                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                    FleetColumn(2,
+                                                CombatColumn.MIDDLE,
+                                                ships=[(Ship(6, ShipType.LIGHT_CRUISER), 0),
+                                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                    FleetColumn(3,
+                                                CombatColumn.LEFT,
+                                                ships=[(Ship(6, ShipType.LIGHT_CRUISER), 0),
+                                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                    FleetColumn(4,
+                                                CombatColumn.WAITING,
+                                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                    FleetColumn(5,
+                                                CombatColumn.WAITING,
+                                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),)
                                    )
         self.assertEqual(
             combat.attacker_fleet,
@@ -73,35 +119,50 @@ class TestCombatStatus(unittest.TestCase):
         )
 
     def test_railgun_combat_round_has_no_defence(self):
+        """
+        :return:
+        """
         combat = CombatStatus(
             (
                 MagicMock(),
                 FleetList((
                     FleetColumn(1, CombatColumn.RIGHT,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                    (Ship(10, ShipType.LIGHT_CRUISER), 0)
+                                ]),
                     FleetColumn(2, CombatColumn.MIDDLE,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
                     FleetColumn(3, CombatColumn.LEFT,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
                     FleetColumn(4, CombatColumn.WAITING,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
                     FleetColumn(5, CombatColumn.WAITING,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
                 ))
             ),
             (
                 MagicMock(),
                 FleetList((
                     FleetColumn(1, CombatColumn.RIGHT,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
                     FleetColumn(2, CombatColumn.MIDDLE,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
                     FleetColumn(3, CombatColumn.LEFT,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
                     FleetColumn(4, CombatColumn.WAITING,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
                     FleetColumn(5, CombatColumn.WAITING,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
                 ))
             ),
             CombatRound.RAIL_GUN
@@ -112,12 +173,14 @@ class TestCombatStatus(unittest.TestCase):
         expected_fleet = FleetList((FleetColumn(1, CombatColumn.RIGHT, ships=[]),
                                     FleetColumn(2, CombatColumn.MIDDLE, ships=[]),
                                     FleetColumn(3, CombatColumn.LEFT, ships=[]),
-                                    FleetColumn(4, CombatColumn.WAITING, ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
-                                                                                (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
-                                    FleetColumn(5, CombatColumn.WAITING, ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
-                                                                                (
-                                                                                    Ship(10, ShipType.LIGHT_CRUISER),
-                                                                                    0)]),)
+                                    FleetColumn(4,
+                                                CombatColumn.WAITING,
+                                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                    FleetColumn(5,
+                                                CombatColumn.WAITING,
+                                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),)
                                    )
         self.assertEqual(
             combat.attacker_fleet,
@@ -132,6 +195,9 @@ class TestCombatStatus(unittest.TestCase):
         )
 
     def test_applies_rollover_damage_to_adjacent_fleets(self):
+        """
+        :return:
+        """
         combat = CombatStatus(
             (
                 MagicMock(),
@@ -143,9 +209,11 @@ class TestCombatStatus(unittest.TestCase):
                     FleetColumn(3, CombatColumn.LEFT,
                                 ships=[(Ship(2, ShipType.LIGHT_CRUISER), 0)]),
                     FleetColumn(4, CombatColumn.WAITING,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
                     FleetColumn(5, CombatColumn.WAITING,
-                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0), (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
                 ))
             ),
             (
@@ -158,9 +226,11 @@ class TestCombatStatus(unittest.TestCase):
                     FleetColumn(3, CombatColumn.LEFT,
                                 ships=[(Ship(1, ShipType.LIGHT_CRUISER), 0)]),
                     FleetColumn(4, CombatColumn.WAITING,
-                                ships=[(Ship(1, ShipType.LIGHT_CRUISER), 0), (Ship(1, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[(Ship(1, ShipType.LIGHT_CRUISER), 0),
+                                       (Ship(1, ShipType.LIGHT_CRUISER), 0)]),
                     FleetColumn(5, CombatColumn.WAITING,
-                                ships=[(Ship(1, ShipType.LIGHT_CRUISER), 0), (Ship(1, ShipType.LIGHT_CRUISER), 0)]),
+                                ships=[(Ship(1, ShipType.LIGHT_CRUISER), 0),
+                                       (Ship(1, ShipType.LIGHT_CRUISER), 0)]),
                 ))
             ),
             CombatRound.MISSILE_ONE
@@ -175,15 +245,14 @@ class TestCombatStatus(unittest.TestCase):
              FleetColumn(4, CombatColumn.WAITING, ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
                                                          (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
              FleetColumn(5, CombatColumn.WAITING, ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
-                                                         (
-                                                             Ship(10, ShipType.LIGHT_CRUISER),
-                                                             0)]),)
-            )
+                                                         (Ship(10, ShipType.LIGHT_CRUISER), 0)]),)
+        )
         self.assertEqual(
             combat.attacker_fleet,
             expected_attacker_fleet,
-            "Attacker {} did not match {}, combat messages were\n{}".format(combat.attacker_fleet,
-                                                                            expected_attacker_fleet, '\n'.join(message))
+            "Attacker {} did not match {}, combat messages were\n{}".format(
+                combat.attacker_fleet,
+                expected_attacker_fleet, '\n'.join(message))
         )
 
         expected_defender_fleet = FleetList((
@@ -194,16 +263,19 @@ class TestCombatStatus(unittest.TestCase):
             FleetColumn(3, CombatColumn.LEFT,
                         ships=[]),
             FleetColumn(4, CombatColumn.WAITING,
-                        ships=[(Ship(1, ShipType.LIGHT_CRUISER), 0), (Ship(1, ShipType.LIGHT_CRUISER), 0)]),
+                        ships=[(Ship(1, ShipType.LIGHT_CRUISER), 0),
+                               (Ship(1, ShipType.LIGHT_CRUISER), 0)]),
             FleetColumn(5, CombatColumn.WAITING,
-                        ships=[(Ship(1, ShipType.LIGHT_CRUISER), 0), (Ship(1, ShipType.LIGHT_CRUISER), 0)]),
+                        ships=[(Ship(1, ShipType.LIGHT_CRUISER), 0),
+                               (Ship(1, ShipType.LIGHT_CRUISER), 0)]),
         ))
 
         self.assertEqual(
             combat.defender_fleet,
             expected_defender_fleet,
-            "Defender {} did not match {}, combat messages were\n{}".format(combat.defender_fleet,
-                                                                            expected_defender_fleet, '\n'.join(message))
+            "Defender {} did not match {}, combat messages were\n{}".format(
+                combat.defender_fleet,
+                expected_defender_fleet, '\n'.join(message))
         )
 
 

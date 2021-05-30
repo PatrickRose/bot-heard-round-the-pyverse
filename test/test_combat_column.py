@@ -1,10 +1,22 @@
+"""
+Tests for combat column
+"""
+
 import unittest
 
 from bot_heard_round.fleet import CombatColumn
 
 
 class CombatColumnTestCase(unittest.TestCase):
+    """
+    Tests for combat column
+    """
+
     def test_adjacent_columns(self):
+        """
+        Test adjacent columns
+        :return:
+        """
         cases = [
             (
                 CombatColumn.LEFT,

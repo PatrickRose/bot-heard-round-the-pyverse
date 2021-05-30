@@ -164,6 +164,9 @@ class FleetColumnTestCase(unittest.TestCase):
                 self.assertEqual(result, second == first)
 
     def test_taking_damage(self):
+        """
+        :return:
+        """
         test_cases = [
             (
                 FleetColumn(-1, ships=[(Ship(10, ShipType.FRIGATE), 0)]),
@@ -184,7 +187,8 @@ class FleetColumnTestCase(unittest.TestCase):
                 5
             ),
             (
-                FleetColumn(-1, ships=[(Ship(10, ShipType.FRIGATE), 0), (Ship(10, ShipType.FRIGATE), 1)]),
+                FleetColumn(-1, ships=[(Ship(10, ShipType.FRIGATE), 0),
+                                       (Ship(10, ShipType.FRIGATE), 1)]),
                 15,
                 FleetColumn(-1, ships=[(Ship(5, ShipType.FRIGATE), 1)]),
                 0

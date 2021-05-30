@@ -87,19 +87,14 @@ class CombatStatus:
             key=lambda x: x.column_number
         )
 
-        if self.combat_round == CombatRound.PENDING:
-            status = "`!!! Combat status !!!`"
-        elif self.combat_round == CombatRound.MISSILE_ONE:
-            status = "`!!! Combat status - round 1 !!!`"
-        elif self.combat_round == CombatRound.MISSILE_TWO:
-            status = "`!!! Combat status - round 2 !!!`"
-        elif self.combat_round == CombatRound.RAIL_GUN:
-            status = "`!!! Combat status - round 3 !!!`"
-        else:
-            status = "`!!! Combat status - finished !!!`"
-
         rows = [
-            status,
+            {
+                CombatRound.PENDING: "`!!! Combat status !!!`",
+                CombatRound.MISSILE_ONE: "`!!! Combat status - round 1 !!!`",
+                CombatRound.MISSILE_TWO: "`!!! Combat status - round 2 !!!`",
+                CombatRound.RAIL_GUN: "`!!! Combat status - round 3 !!!`",
+                CombatRound.FINISHED: "`!!! Combat status - finished !!!`",
+            }[self.combat_round],
             "Attacker: `{}`".format(attacker),
             "Defender: `{}`".format(defender)
         ]
@@ -121,27 +116,13 @@ class CombatStatus:
         attacker_fleet_activated: dict[CombatColumn, list[tuple[Ship, int]]] = {}
         defender_fleet_activated: dict[CombatColumn, list[tuple[Ship, int]]] = {}
 
-        for column in CombatColumn:
-            if column == CombatColumn.WAITING:
-                continue
-
+        for column in CombatColumn.active_columns():
             attacker = self.attacker_fleet.where_column(column)
 
-            if not attacker:
-                attacker = FleetColumn(-1)
-            else:
-                attacker = attacker[0]
-
-            attacker_fleet_activated[column] = attacker.ships
+            attacker_fleet_activated[column] = attacker[0].ships if attacker else []
 
             defender = self.defender_fleet.where_column(column)
-
-            if not defender:
-                defender = FleetColumn(-1)
-            else:
-                defender = defender[0]
-
-            defender_fleet_activated[column] = defender.ships
+            defender_fleet_activated[column] = defender[0].ships if defender else []
 
         ship_table = []
 
@@ -150,28 +131,17 @@ class CombatStatus:
                 0,
                 -1
         ):
-            if i_attacker_pos > len(attacker_fleet_activated[CombatColumn.LEFT]):
-                left = ''
-            else:
-                left = str(attacker_fleet_activated[CombatColumn.LEFT][i_attacker_pos - 1][0])
+            to_add = {}
 
-            if i_attacker_pos > len(attacker_fleet_activated[CombatColumn.MIDDLE]):
-                middle = ''
-            else:
-                middle = str(attacker_fleet_activated[CombatColumn.MIDDLE][i_attacker_pos - 1][0])
+            for column in CombatColumn.active_columns():
+                if i_attacker_pos > len(attacker_fleet_activated[CombatColumn.LEFT]):
+                    ship = ''
+                else:
+                    ship = str(attacker_fleet_activated[CombatColumn.LEFT][i_attacker_pos - 1][0])
 
-            if i_attacker_pos > len(attacker_fleet_activated[CombatColumn.RIGHT]):
-                right = ''
-            else:
-                right = str(attacker_fleet_activated[CombatColumn.RIGHT][i_attacker_pos - 1][0])
+                to_add[column] = ship
 
-            ship_table.append({
-                CombatColumn.LEFT: left,
-                CombatColumn.MIDDLE: middle,
-                CombatColumn.RIGHT: right
-            })
-
-            i_attacker_pos -= 1
+            ship_table.append(to_add)
 
         ship_table.append({
             CombatColumn.LEFT: '-----',
@@ -180,26 +150,17 @@ class CombatStatus:
         })
 
         for i in range(max(len(defender_fleet_activated[x]) for x in defender_fleet_activated)):
-            if i >= len(defender_fleet_activated[CombatColumn.LEFT]):
-                left = ''
-            else:
-                left = str(defender_fleet_activated[CombatColumn.LEFT][i][0])
+            to_add = {}
 
-            if i >= len(defender_fleet_activated[CombatColumn.MIDDLE]):
-                middle = ''
-            else:
-                middle = str(defender_fleet_activated[CombatColumn.MIDDLE][i][0])
+            for column in CombatColumn.active_columns():
+                if i >= len(defender_fleet_activated[CombatColumn.LEFT]):
+                    ship = ''
+                else:
+                    ship = str(defender_fleet_activated[CombatColumn.LEFT][i][0])
 
-            if i >= len(defender_fleet_activated[CombatColumn.RIGHT]):
-                right = ''
-            else:
-                right = str(defender_fleet_activated[CombatColumn.RIGHT][i][0])
+                to_add[column] = ship
 
-            ship_table.append({
-                CombatColumn.LEFT: left,
-                CombatColumn.MIDDLE: middle,
-                CombatColumn.RIGHT: right
-            })
+            ship_table.append(to_add)
 
         if len(ship_table) != 1:
             rows.append(
@@ -330,64 +291,19 @@ class CombatStatus:
         carry_over = []
 
         for combat_column in CombatColumn.active_columns():
-            lines = ['PROCESSING {}'.format(combat_column.value)]
+            lines, new_carry_over = self.run_combat_column(combat_column)
 
-            attacker_ships = self.attacker_fleet.where_column(combat_column)
-            defender_ships = self.defender_fleet.where_column(combat_column)
-
-            if attacker_ships:
-                attacker_ships = attacker_ships[0]
-            else:
-                attacker_ships = FleetColumn(-1)
-
-            if defender_ships:
-                defender_ships = defender_ships[0]
-            else:
-                defender_ships = FleetColumn(-1)
-
-            attacker_attack = attacker_ships.attack
-            defender_attack = defender_ships.attack
-
-            if self.combat_round == CombatRound.RAIL_GUN:
-                attacker_defence = 0
-                defender_defence = 0
-            else:
-                attacker_defence = attacker_ships.defence
-                defender_defence = defender_ships.defence
-
-            lines.append(
-                'Attacker {} has `{}` attack and `{}` defence'.format(
-                    self.attacker.mention,
-                    attacker_attack,
-                    attacker_defence
-                )
-            )
-            lines.append(
-                'Defender {} has `{}` attack and `{}` defence'.format(
-                    self.defender.mention,
-                    defender_attack,
-                    defender_defence
-                )
-            )
-
-            new_lines, new_carry_over = self.run_combat_damage(attacker_attack, defender_defence, defender_ships,
-                                                               self.defender_fleet,
-                                                               combat_column)
-            lines += new_lines
             carry_over += new_carry_over
-
-            new_lines, new_carry_over = self.run_combat_damage(defender_attack, attacker_defence, attacker_ships,
-                                                               self.attacker_fleet,
-                                                               combat_column)
-            lines += new_lines
-            carry_over += new_carry_over
-
             messages.append('\n'.join(lines))
 
         for damage, fleets, combat_column, dealer in carry_over:
             lines = []
             for ships in fleets:
-                lines.append('{} deals {} carry over damage to {}'.format(dealer, damage, combat_column.value))
+                lines.append('{} deals {} carry over damage to {}'.format(
+                    dealer,
+                    damage,
+                    combat_column.value
+                ))
                 _, new_lines = ships.take_damage(damage)
                 lines += new_lines
 
@@ -395,9 +311,20 @@ class CombatStatus:
 
         return messages
 
-    def run_combat_damage(self, attack: int, defence: int, ships: FleetColumn, fleet: FleetList,
+    def run_combat_damage(self, attack_defence: tuple[int, int],
+                          ships: FleetColumn, fleet: FleetList,
                           combat_column: CombatColumn) -> (
-    list[str], list[tuple[int, list[FleetColumn]], CombatColumn, str]):
+            list[str], list[tuple[int, list[FleetColumn]], CombatColumn, str]):
+        """
+
+        :param attack_defence:
+        :param ships:
+        :param fleet:
+        :param combat_column:
+        :return:
+        """
+        attack, defence = attack_defence
+
         damage_dealer = 'Attacker' if self.defender_fleet == fleet else 'Defender'
         damage_taker = 'defender' if self.defender_fleet == fleet else 'attacker'
         lines = []
@@ -414,6 +341,72 @@ class CombatStatus:
 
                 for column in CombatColumn.adjacent_columns(combat_column):
                     lines.append('{} will take {} damage'.format(column.value, carry_over))
-                    carry_over_damage.append((carry_over, fleet.where_column(column), combat_column, damage_dealer))
+                    carry_over_damage.append(
+                        (
+                            carry_over,
+                            fleet.where_column(column),
+                            combat_column,
+                            damage_dealer
+                        )
+                    )
 
         return lines, carry_over_damage
+
+    def run_combat_column(self, combat_column: CombatColumn):
+        """
+
+        :param combat_column:
+        :return:
+        """
+        carry_over = []
+        lines = ['PROCESSING {}'.format(combat_column.value)]
+
+        attacker_ships = self.attacker_fleet.where_column(combat_column)
+        defender_ships = self.defender_fleet.where_column(combat_column)
+
+        if attacker_ships:
+            attacker_ships = attacker_ships[0]
+        else:
+            attacker_ships = FleetColumn(-1)
+
+        if defender_ships:
+            defender_ships = defender_ships[0]
+        else:
+            defender_ships = FleetColumn(-1)
+
+        attack = (attacker_ships.attack, defender_ships.attack)
+
+        if self.combat_round == CombatRound.RAIL_GUN:
+            defence = (0, 0)
+        else:
+            defence = (attacker_ships.defence, defender_ships.defence)
+
+        lines.append(
+            'Attacker {} has `{}` attack and `{}` defence'.format(
+                self.attacker.mention,
+                attack[0],
+                defence[0]
+            )
+        )
+        lines.append(
+            'Defender {} has `{}` attack and `{}` defence'.format(
+                self.defender.mention,
+                attack[1],
+                defence[1]
+            )
+        )
+
+        new_lines, new_carry_over = self.run_combat_damage((attack[0], defence[1]),
+                                                           defender_ships,
+                                                           self.defender_fleet,
+                                                           combat_column)
+        lines += new_lines
+        carry_over += new_carry_over
+        new_lines, new_carry_over = self.run_combat_damage((attack[1], defence[0]),
+                                                           attacker_ships,
+                                                           self.attacker_fleet,
+                                                           combat_column)
+        lines += new_lines
+        carry_over += new_carry_over
+
+        return lines, carry_over
