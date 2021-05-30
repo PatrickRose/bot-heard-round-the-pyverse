@@ -172,6 +172,8 @@ async def start_combat(ctx: commands.context.Context, target: str):
     await attacker_fleet_msg.reply('Importing fleet now...')
     combat_status.add_fleet_for(True, attacker_fleet_msg.content)
 
+    ## TODO: INCLUDE PATROL MODE HERE
+
     await combat_status.update_message()
 
     await channel.send(
@@ -330,12 +332,17 @@ async def start_combat_loop(combat_status: CombatStatus):
 
     messages = {
         CombatRound.MISSILE_ONE: 'COMBAT HAS STARTED!',
-        CombatRound.MISSILE_TWO: 'Second round of combat',
+        CombatRound.MISSILE_TWO: 'Second round of combat. If nobody retreats Railgun combat will start!',
         CombatRound.RAIL_GUN: 'Final combat round. ALL DEFENCE WILL BE ZERO THIS ROUND',
     }
 
     for combat_round in messages:
         combat_status.combat_round = combat_round
+
+        if combat_round != CombatRound.MISSILE_ONE:
+            # TODO: Allow moving of combat columns
+            pass
+
         await combat_status.update_message()
 
         await channel.send(messages[combat_round])
@@ -379,6 +386,12 @@ async def start_combat_loop(combat_status: CombatStatus):
 
         for message in combat_status.resolve_combat_round():
             await channel.send(message)
+
+            await combat_status.update_message()
+            await channel.send(str(combat_status))
+
+    combat_status.combat_round = CombatRound.FINISHED
+    await combat_status.update_message()
 
 
 bot.run(TOKEN)

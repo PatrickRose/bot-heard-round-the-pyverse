@@ -106,14 +106,14 @@ class CombatStatus:
 
         if attacker_fleet_waiting:
             rows.append(
-                "Attacker ships to apply:\n{}".format(
+                "Attacker ships in reserve:\n{}".format(
                     '\n'.join(['{}'.format(str(x)) for x in attacker_fleet_waiting])
                 )
             )
 
         if defender_fleet_waiting:
             rows.append(
-                "Defender ships to apply:\n{}".format(
+                "Defender ships reserve:\n{}".format(
                     '\n'.join(['{}'.format(str(x)) for x in defender_fleet_waiting])
                 )
             )
@@ -355,13 +355,15 @@ class CombatStatus:
                 defender_defence = defender_ships.defence
 
             lines.append(
-                'Attacker has `{}` attack and `{}` defence'.format(
+                'Attacker {} has `{}` attack and `{}` defence'.format(
+                    self.attacker.mention,
                     attacker_attack,
                     attacker_defence
                 )
             )
             lines.append(
-                'Defender has `{}` attack and `{}` defence'.format(
+                'Defender {} has `{}` attack and `{}` defence'.format(
+                    self.defender.mention,
                     defender_attack,
                     defender_defence
                 )
@@ -375,6 +377,7 @@ class CombatStatus:
                 lines += new_lines
 
                 if carry_over > 0:
+                    ## TODO: Hit adjacent columns
                     lines.append('{} CARRY OVER DAMAGE HITS WAITING FLEETS'.format(carry_over))
                     for fleet in self.defender_fleet.where_column(CombatColumn.WAITING):
                         _, new_lines = fleet.take_damage(carry_over)
@@ -388,6 +391,7 @@ class CombatStatus:
                 lines += new_lines
 
                 if carry_over > 0:
+                    ## TODO: Hit adjacent columns
                     lines.append('{} CARRY OVER DAMAGE HITS WAITING FLEETS'.format(carry_over))
                     for fleet in self.attacker_fleet.where_column(CombatColumn.WAITING):
                         _, new_lines = fleet.take_damage(carry_over)
