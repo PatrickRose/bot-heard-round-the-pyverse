@@ -56,7 +56,8 @@ class FleetColumn:
     def __init__(self,
                  column_number: int,
                  combat_column: CombatColumn = CombatColumn.WAITING,
-                 ships: list[tuple[Ship, int]] = None
+                 ships: list[tuple[Ship, int]] = None,
+                 fleet_list=None
                  ):
         if ships is None:
             ships = []
@@ -64,6 +65,7 @@ class FleetColumn:
         self.column_number = column_number
         self.combat_column = combat_column
         self.ships = ships
+        self.fleet_list = fleet_list
 
     @property
     def defence(self):
@@ -71,7 +73,9 @@ class FleetColumn:
 
         :rtype: int
         """
-        return sum([x[0].defence for x in self.ships])
+        defence = sum([x[0].defence for x in self.ships])
+
+        return defence if not self.patrol_mode else defence // 2
 
     @property
     def attack(self):
@@ -79,7 +83,9 @@ class FleetColumn:
 
         :rtype: int
         """
-        return sum([x[0].attack for x in self.ships])
+        attack = sum([x[0].attack for x in self.ships])
+
+        return attack if not self.patrol_mode else attack // 2
 
     def add_ship(self, ship: Ship, position: int):
         """
@@ -92,6 +98,14 @@ class FleetColumn:
         self.ships.sort(
             key=lambda x: x[1]
         )
+
+    @property
+    def patrol_mode(self):
+        """
+        Check if the fleet is in patrol mode or not
+        :return: bool
+        """
+        return self.fleet_list and self.fleet_list.patrol_mode
 
     def __str__(self):
         return 'Fleet column {}\nShips: {}'.format(
@@ -144,11 +158,9 @@ class FleetColumn:
         if not isinstance(other, FleetColumn):
             return False
 
-        if other.column_number != self.column_number:
-            return False
-
-        if other.combat_column != self.combat_column:
-            return False
+        for attr in ['patrol_mode', 'column_number', 'combat_column']:
+            if getattr(self, attr) != getattr(other, attr):
+                return False
 
         if len(self.ships) != len(other.ships):
             return False
@@ -196,7 +208,8 @@ class FleetList:
                      FleetColumn,
                      FleetColumn,
                      FleetColumn
-                 ] = None
+                 ] = None,
+                 patrol_mode: bool = False
                  ):
         if columns is None:
             columns = (
@@ -207,7 +220,11 @@ class FleetList:
                 FleetColumn(5),
             )
 
+        for column in columns:
+            column.fleet_list = self
+
         self.columns = columns
+        self.patrol_mode = patrol_mode
 
     @classmethod
     def from_str(cls, fleet_str: str):
@@ -215,6 +232,10 @@ class FleetList:
 
         :rtype: FleetList
         """
+        patrol_mode = fleet_str[0:3] == '<P>'
+        if patrol_mode:
+            fleet_str = fleet_str[3:]
+
         fleet = fleet_str.split('|')
 
         columns = (
@@ -245,7 +266,7 @@ class FleetList:
 
             columns[column_num].add_ship(ship, position)
 
-        return FleetList(columns)
+        return FleetList(columns, patrol_mode=patrol_mode)
 
     def where_column(self, combat_column: CombatColumn) -> list[FleetColumn]:
         """
@@ -259,7 +280,14 @@ class FleetList:
         if not isinstance(other, FleetList):
             return False
 
-        return self.columns == other.columns
+        for attr in ['patrol_mode', 'columns']:
+            if getattr(self, attr) != getattr(other, attr):
+                print('{} self={} other={}'.format(attr, getattr(self, attr), getattr(other, attr)))
+                return False
+
+        return True
 
     def __str__(self):
-        return '\n'.join([str(x) for x in self.columns])
+        patrol_mode = ['PATROL MODE'] if self.patrol_mode else []
+
+        return '\n'.join(patrol_mode + [str(x) for x in self.columns])

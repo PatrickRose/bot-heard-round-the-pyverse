@@ -1,7 +1,6 @@
 """
 Unit tests for fleet list
 """
-
 import unittest
 
 from bot_heard_round.fleet import FleetList, CombatColumn
@@ -85,7 +84,13 @@ class FleetListTest(unittest.TestCase):
 
         for expected, fleet_string in test_cases:
             with self.subTest(str=fleet_string):
-                self.assertEqual(expected, FleetList.from_str(fleet_string))
+                actual = FleetList.from_str(fleet_string)
+                self.assertEqual(expected, actual, '{} did not match {}'.format(expected, actual))
+
+            with self.subTest('Patrol mode', str='<P>' + fleet_string):
+                expected.patrol_mode = True
+                actual = FleetList.from_str('<P>' + fleet_string)
+                self.assertEqual(expected, actual, '{} did not match {}'.format(expected, actual))
 
     def test_can_handle_all_fleet_strs(self):
         """

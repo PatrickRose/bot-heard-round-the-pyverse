@@ -3,9 +3,9 @@ Unit tests for fleet column
 """
 
 import unittest
-from unittest.mock import MagicMock, create_autospec
+from unittest.mock import MagicMock, create_autospec, PropertyMock
 
-from bot_heard_round.fleet import FleetColumn
+from bot_heard_round.fleet import FleetColumn, FleetList
 from bot_heard_round.ship import Ship, ShipType
 
 
@@ -155,6 +155,15 @@ class FleetColumnTestCase(unittest.TestCase):
                 FleetColumn(1, ships=[(fighter, 0), (damaged_cruiser, 1)]),
                 True
             ),
+            (
+                FleetColumn(
+                    1,
+                    ships=[(fighter, 0), (damaged_cruiser, 1)],
+                    fleet_list=FleetList(patrol_mode=True)
+                ),
+                FleetColumn(1, ships=[(fighter, 0), (damaged_cruiser, 1)]),
+                False
+            ),
         ]
 
         for first, second, result in test_cases:
@@ -200,6 +209,63 @@ class FleetColumnTestCase(unittest.TestCase):
                 actual_carry, _ = base.take_damage(damage)
                 self.assertEqual(base, expected)
                 self.assertEqual(carry_over, actual_carry)
+
+    def test_attack_defence_values(self):
+        """
+
+        :return:
+        """
+        for prop in ['attack', 'defence']:
+            proxy_val_two = MagicMock(ShipType)
+            property_mock = PropertyMock(return_value=2)
+            setattr(type(proxy_val_two), prop, property_mock)
+            ship_with_two = Ship(1, proxy_val_two)
+
+            proxy_val_two = MagicMock(ShipType)
+            property_mock = PropertyMock(return_value=1)
+            setattr(type(proxy_val_two), prop, property_mock)
+            ship_val_one = Ship(1, proxy_val_two)
+
+            patrol_fleet_list = FleetList(patrol_mode=True)
+
+            cases = [
+                (
+                    FleetColumn(0, ships=[(ship_with_two, 0)]),
+                    2
+                ),
+                (
+                    FleetColumn(0, ships=[(ship_with_two, 0)], fleet_list=patrol_fleet_list),
+                    1
+                ),
+                (
+                    FleetColumn(0, ships=[(ship_with_two, 0), (ship_with_two, 0)]),
+                    4
+                ),
+                (
+                    FleetColumn(
+                        0,
+                        ships=[(ship_with_two, 0), (ship_with_two, 0)],
+                        fleet_list=patrol_fleet_list
+                    ),
+                    2
+                ),
+                (
+                    FleetColumn(0, ships=[(ship_with_two, 0), (ship_val_one, 0)]),
+                    3
+                ),
+                (
+                    FleetColumn(
+                        0,
+                        ships=[(ship_with_two, 0), (ship_val_one, 0)],
+                        fleet_list=patrol_fleet_list
+                    ),
+                    1
+                ),
+            ]
+
+            for case, expected in cases:
+                with self.subTest(fleet=case, prop=prop):
+                    self.assertEqual(getattr(case, prop), expected)
 
 
 if __name__ == '__main__':

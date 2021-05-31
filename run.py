@@ -23,6 +23,9 @@ LEFT_EMOJI = emoji.emojize(':regional_indicator_l:', use_aliases=True)
 CENTRE_EMOJI = emoji.emojize(':regional_indicator_c:', use_aliases=True)
 RIGHT_EMOJI = emoji.emojize(':regional_indicator_r:', use_aliases=True)
 
+TICK_EMOJI = emoji.emojize(':white_check_mark:', use_aliases=True)
+CROSS_EMOJI = emoji.emojize(':negative_squared_cross_mark:', use_aliases=True)
+
 intents = discord.Intents.default()
 intents.members = True
 
@@ -359,7 +362,8 @@ async def start_combat_loop(combat_status: CombatStatus):
             pass
         else:
             await channel.send('COMBAT IS STARTING ARE YOU SURE HIT THE REACT BUTTONS ETC ETC')
-            await channel.send('Something to do with patrol mode will happen here')
+
+            await handle_patrol_mode(channel, combat_status)
 
         await combat_status.update_message()
 
@@ -413,6 +417,37 @@ async def start_combat_loop(combat_status: CombatStatus):
 
     combat_status.combat_round = CombatRound.FINISHED
     await combat_status.update_message()
+
+
+async def handle_patrol_mode(channel: discord.TextChannel, combat_status: CombatStatus):
+    """
+    Handle patrol mode
+    :param channel:
+    :param combat_status:
+    :return:
+    """
+    for user_to_mention, fleet in [(combat_status.attacker, combat_status.attacker_fleet),
+                                   (combat_status.defender, combat_status.defender_fleet)]:
+        message = await channel.send(
+            '{}, please confirm whether your fleet is in patrol mode or not'
+            '(Your spreadsheet says that it {})'
+            'If so, react with {} otherwise react with {}'.format(
+                user_to_mention.mention,
+                'is' if fleet.patrol_mode else 'is not',
+                TICK_EMOJI,
+                CROSS_EMOJI
+            )
+        )
+
+        for emoji_to_add in [TICK_EMOJI, CROSS_EMOJI]:
+            await message.add_reaction(emoji_to_add)
+
+        react, _ = await bot.wait_for(
+            'reaction_add',
+            check=reaction_check(message, user_to_mention, [TICK_EMOJI, CROSS_EMOJI])
+        )
+
+        fleet.patrol_mode = react == TICK_EMOJI
 
 
 bot.run(TOKEN)
