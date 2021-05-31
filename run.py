@@ -172,8 +172,6 @@ async def start_combat(ctx: commands.context.Context, target: str):
     await attacker_fleet_msg.reply('Importing fleet now...')
     combat_status.add_fleet_for(True, attacker_fleet_msg.content)
 
-    # INCLUDE PATROL MODE HERE
-
     await combat_status.update_message()
 
     await channel.send(
@@ -359,6 +357,9 @@ async def start_combat_loop(combat_status: CombatStatus):
         if combat_round != CombatRound.MISSILE_ONE:
             # Allow moving of combat columns
             pass
+        else:
+            await channel.send('COMBAT IS STARTING ARE YOU SURE HIT THE REACT BUTTONS ETC ETC')
+            await channel.send('Something to do with patrol mode will happen here')
 
         await combat_status.update_message()
 
@@ -406,6 +407,9 @@ async def start_combat_loop(combat_status: CombatStatus):
 
             await combat_status.update_message()
             await channel.send(str(combat_status))
+
+        if '🏳' in [attack_react.emoji, defend_react.emoji]:
+            await channel.send('A player has retreated, combat finished')
 
     combat_status.combat_round = CombatRound.FINISHED
     await combat_status.update_message()

@@ -5,10 +5,14 @@ Fleet module
 import enum
 import re
 
+import emoji
+
 from bot_heard_round.ship import Ship, ShipType
 
 add_fleet_ship_regex = re.compile('(.+?)(\\d+)\\[(\\d+),(\\d+)]')
 fleet_column_regex = re.compile('Fleet column (\\d+)')
+
+BOOM_EMOJI = emoji.emojize(':boom:', use_aliases=True)
 
 
 class CombatColumn(enum.Enum):
@@ -170,7 +174,7 @@ class FleetColumn:
             ship = self.ships[0]
             if damage >= ship[0].current_health:
                 damage -= ship[0].current_health
-                message.append("{} is destroyed!".format(ship[0]))
+                message.append("{} {} is destroyed!".format(BOOM_EMOJI, ship[0]))
                 self.ships.remove(ship)
             else:
                 message.append("{} takes {} damage".format(ship[0], damage))
