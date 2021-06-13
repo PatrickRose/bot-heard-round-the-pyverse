@@ -6,25 +6,12 @@ import os
 import random
 
 import discord
-import emoji
 from discord.ext import commands
 from dotenv import load_dotenv
 
+from bot_heard_round import emoji
 from bot_heard_round.combat_status import CombatRound, CombatStatus
 from bot_heard_round.fleet import CombatColumn, FleetList
-
-ONE_EMOJI = emoji.emojize(':one:', use_aliases=True)
-TWO_EMOJI = emoji.emojize(':two:', use_aliases=True)
-THREE_EMOJI = emoji.emojize(':three:', use_aliases=True)
-FOUR_EMOJI = emoji.emojize(':four:', use_aliases=True)
-FIVE_EMOJI = emoji.emojize(':five:', use_aliases=True)
-
-LEFT_EMOJI = emoji.emojize(':regional_indicator_l:', use_aliases=True)
-CENTRE_EMOJI = emoji.emojize(':regional_indicator_c:', use_aliases=True)
-RIGHT_EMOJI = emoji.emojize(':regional_indicator_r:', use_aliases=True)
-
-TICK_EMOJI = emoji.emojize(':white_check_mark:', use_aliases=True)
-CROSS_EMOJI = emoji.emojize(':negative_squared_cross_mark:', use_aliases=True)
 
 intents = discord.Intents.default()
 intents.members = True
@@ -251,19 +238,11 @@ async def request_ships(combat_status: CombatStatus, apply_attackers: bool):
     ship_list = {}
     ship_text = []
 
-    possible_emojis = [
-        ONE_EMOJI,
-        TWO_EMOJI,
-        THREE_EMOJI,
-        FOUR_EMOJI,
-        FIVE_EMOJI,
-    ]
-
     for fleet_column in fleet.where_column(CombatColumn.WAITING):
         if not fleet_column.ships:
             continue
 
-        emoji_to_send = possible_emojis[fleet_column.column_number - 1]
+        emoji_to_send = emoji.POSSIBLE_EMOJI[fleet_column.column_number - 1]
 
         ship_list[emoji_to_send] = fleet_column
         ship_text.append(
@@ -307,9 +286,9 @@ async def request_ships(combat_status: CombatStatus, apply_attackers: bool):
     )
 
     columns = {
-        LEFT_EMOJI: CombatColumn.LEFT,
-        CENTRE_EMOJI: CombatColumn.MIDDLE,
-        RIGHT_EMOJI: CombatColumn.RIGHT
+        emoji.LEFT_EMOJI: CombatColumn.LEFT,
+        emoji.CENTRE_EMOJI: CombatColumn.MIDDLE,
+        emoji.RIGHT_EMOJI: CombatColumn.RIGHT
     }
 
     for emoji_to_send in columns:
@@ -358,11 +337,8 @@ async def start_combat_loop(combat_status: CombatStatus):
         combat_status.combat_round = combat_round
 
         if combat_round != CombatRound.MISSILE_ONE:
-            # Allow moving of combat columns
-            pass
+            await allow_fleet_switch(channel, combat_status)
         else:
-            await channel.send('COMBAT IS STARTING ARE YOU SURE HIT THE REACT BUTTONS ETC ETC')
-
             await handle_patrol_mode(channel, combat_status)
 
         await combat_status.update_message()
@@ -434,20 +410,95 @@ async def handle_patrol_mode(channel: discord.TextChannel, combat_status: Combat
             'If so, react with {} otherwise react with {}'.format(
                 user_to_mention.mention,
                 'is' if fleet.patrol_mode else 'is not',
-                TICK_EMOJI,
-                CROSS_EMOJI
+                emoji.TICK_EMOJI,
+                emoji.CROSS_EMOJI
             )
         )
 
-        for emoji_to_add in [TICK_EMOJI, CROSS_EMOJI]:
+        for emoji_to_add in [emoji.TICK_EMOJI, emoji.CROSS_EMOJI]:
             await message.add_reaction(emoji_to_add)
 
         react, _ = await bot.wait_for(
             'reaction_add',
-            check=reaction_check(message, user_to_mention, [TICK_EMOJI, CROSS_EMOJI])
+            check=reaction_check(
+                message,
+                user_to_mention,
+                [emoji.TICK_EMOJI, emoji.CROSS_EMOJI]
+            )
         )
 
-        fleet.patrol_mode = react == TICK_EMOJI
+        fleet.patrol_mode = react == emoji.TICK_EMOJI
+
+
+async def allow_fleet_switch(channel: discord.TextChannel, combat_status: CombatStatus):
+    """
+
+    :param channel:
+    :param combat_status:
+    :return:
+    """
+    for user_to_mention, fleet in [(combat_status.attacker, combat_status.attacker_fleet),
+                                   (combat_status.defender, combat_status.defender_fleet)]:
+        try:
+            emojis_to_add, waiting_fleet = fleet.swap_options()
+        except FleetList.NoWaitingFleetError:
+            await channel.send(
+                '{} has no waiting fleets, skipping fleet movement'.format(
+                    user_to_mention.display_name
+                )
+            )
+            continue
+
+        message = await channel.send(
+            '{} if you wish to swap a fleet column with a waiting fleet, '
+            'react with the column you wish to move'.format(
+                user_to_mention.mention
+            )
+        )
+
+        for emoji_to_add in emojis_to_add:
+            await message.add_reaction(emoji_to_add)
+
+        react, _ = await bot.wait_for(
+            'reaction_add',
+            check=reaction_check(message, user_to_mention, emojis_to_add)
+        )
+
+        if not emojis_to_add[react.emoji]:
+            continue
+
+        if len(waiting_fleet) == 1:
+            _, to_swap_in = waiting_fleet.popitem()
+        else:
+            lines = ['React with which waiting fleet you wish to swap in']
+
+            ship_list = {}
+
+            for emoji_to_send in waiting_fleet:
+                lines.append(
+                    "{}: Column {}: {}".format(
+                        emoji_to_send,
+                        waiting_fleet[emoji_to_send],
+                        fleet.where_number(waiting_fleet[emoji_to_send])
+                    )
+                )
+
+            message = await channel.send(
+                "\n".join(lines)
+            )
+
+            swap_react, _ = await bot.wait_for(
+                'reaction_add',
+                check=reaction_check(
+                    message,
+                    user_to_mention,
+                    ship_list
+                )
+            )
+
+            to_swap_in = ship_list[swap_react.emoji]
+
+        fleet.swap_columns(emojis_to_add[react.emoji], to_swap_in)
 
 
 bot.run(TOKEN)

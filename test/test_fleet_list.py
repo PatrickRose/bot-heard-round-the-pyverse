@@ -3,6 +3,7 @@ Unit tests for fleet list
 """
 import unittest
 
+from bot_heard_round import emoji
 from bot_heard_round.fleet import FleetList, CombatColumn
 from bot_heard_round.ship import Ship, ShipType
 
@@ -110,6 +111,54 @@ class FleetListTest(unittest.TestCase):
                 expected.columns[0].add_ship(Ship(10, member), 0)
                 expected.columns[0].add_ship(Ship(10, member), 1)
                 self.assertEqual(expected, FleetList.from_str(f'{base_ship}[1,0]|{base_ship}[1,1]'))
+
+    def test_can_ask_for_options_for_fleet_swap(self):
+        """
+        Test fleet swap
+        :return:
+        """
+        fleet_list = FleetList()
+        selected_column = {
+            1: CombatColumn.LEFT,
+            2: CombatColumn.MIDDLE,
+            3: CombatColumn.RIGHT,
+            4: CombatColumn.WAITING,
+            5: CombatColumn.WAITING,
+        }
+
+        for column in fleet_list.columns:
+            column.add_ship(Ship(10, ShipType.FRIGATE), 0)
+            column.combat_column = selected_column[column.column_number]
+
+        expected = (
+            {
+                emoji.CROSS_EMOJI: None,
+                emoji.LEFT_EMOJI: 1,
+                emoji.CENTRE_EMOJI: 2,
+                emoji.RIGHT_EMOJI: 3,
+            },
+            {
+                emoji.FOUR_EMOJI: 4,
+                emoji.FIVE_EMOJI: 5
+            }
+        )
+
+        self.assertEqual(
+            expected,
+            fleet_list.swap_options()
+        )
+
+    def test_asking_for_options_with_no_waiting_fleets_triggers_error(self):
+        """
+        Test fleet swap
+        :return:
+        """
+        fleet_list = FleetList()
+
+        self.assertRaises(
+            FleetList.NoWaitingFleetError,
+            fleet_list.swap_options
+        )
 
 
 if __name__ == '__main__':

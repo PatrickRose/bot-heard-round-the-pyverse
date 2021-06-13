@@ -5,14 +5,12 @@ Fleet module
 import enum
 import re
 
-import emoji
-
+from bot_heard_round import emoji
 from bot_heard_round.ship import Ship, ShipType
 
 add_fleet_ship_regex = re.compile('(.+?)(\\d+)\\[(\\d+),(\\d+)]')
 fleet_column_regex = re.compile('Fleet column (\\d+)')
 
-BOOM_EMOJI = emoji.emojize(':boom:', use_aliases=True)
 
 
 class CombatColumn(enum.Enum):
@@ -186,7 +184,7 @@ class FleetColumn:
             ship = self.ships[0]
             if damage >= ship[0].current_health:
                 damage -= ship[0].current_health
-                message.append("{} {} is destroyed!".format(BOOM_EMOJI, ship[0]))
+                message.append("{} {} is destroyed!".format(emoji.BOOM_EMOJI, ship[0]))
                 self.ships.remove(ship)
             else:
                 message.append("{} takes {} damage".format(ship[0], damage))
@@ -200,6 +198,11 @@ class FleetList:
     """
     Fleet list encapsulation
     """
+
+    class NoWaitingFleetError(OverflowError):
+        """
+        Error for if there are no waiting fleets
+        """
 
     def __init__(self,
                  columns: tuple[
@@ -282,7 +285,6 @@ class FleetList:
 
         for attr in ['patrol_mode', 'columns']:
             if getattr(self, attr) != getattr(other, attr):
-                print('{} self={} other={}'.format(attr, getattr(self, attr), getattr(other, attr)))
                 return False
 
         return True
@@ -291,3 +293,71 @@ class FleetList:
         patrol_mode = ['PATROL MODE'] if self.patrol_mode else []
 
         return '\n'.join(patrol_mode + [str(x) for x in self.columns])
+
+    def swap_options(self):
+        """
+        Get the list of options for swapping
+        :return:
+        """
+        waiting_fleet = list(
+            filter(
+                lambda waiting_column: waiting_column.ships,
+                self.where_column(CombatColumn.WAITING),
+            )
+        )
+
+        if not waiting_fleet:
+            raise FleetList.NoWaitingFleetError
+
+        emojis_to_add = {
+            emoji.CROSS_EMOJI: None
+        }
+        column_to_emoji = {
+            CombatColumn.LEFT: emoji.LEFT_EMOJI,
+            CombatColumn.MIDDLE: emoji.CENTRE_EMOJI,
+            CombatColumn.RIGHT: emoji.RIGHT_EMOJI,
+        }
+
+        for column in CombatColumn.active_columns():
+            fleet_column = self.where_column(column)
+
+            if fleet_column:
+                emojis_to_add[column_to_emoji[column]] = fleet_column[0].column_number
+
+        ship_list = {}
+
+        for waiting in waiting_fleet:
+            emoji_to_send = emoji.POSSIBLE_EMOJI[waiting.column_number - 1]
+
+            ship_list[emoji_to_send] = waiting.column_number
+
+        return (
+            emojis_to_add,
+            ship_list
+        )
+
+    def where_number(self, column_number: int):
+        """
+
+        :param column_number:
+        :return:
+        """
+        for fleet in self.columns:
+            if fleet.column_number == column_number:
+                return fleet
+
+        raise IndexError
+
+    def swap_columns(self, to_swap_out: int, to_swap_in: int):
+        """
+        Swap the columns
+        :param to_swap_out:
+        :param to_swap_in:
+        :return:
+        """
+        swap_out = self.where_number(to_swap_out)
+        swap_in = self.where_number(to_swap_in)
+
+        swap_out_combat_column = swap_out.combat_column
+        swap_out.combat_column = swap_in.combat_column
+        swap_in.combat_column = swap_out_combat_column
