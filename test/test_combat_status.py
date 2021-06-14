@@ -278,6 +278,79 @@ class TestCombatStatus(unittest.TestCase):
                 expected_defender_fleet, '\n'.join(message))
         )
 
+    def test_string_representation(self):
+        """
+
+        :return:
+        """
+        attacker = MagicMock()
+        attacker.display_name = 'ATTACKER'
+
+        defender = MagicMock()
+        defender.display_name = 'DEFENDER'
+
+        combat_status = CombatStatus(
+            (
+                attacker,
+                FleetList((
+                    FleetColumn(1, CombatColumn.RIGHT,
+                                ships=[(Ship(1, ShipType.LIGHT_CRUISER), 0)]),
+                    FleetColumn(2, CombatColumn.MIDDLE,
+                                ships=[(Ship(2, ShipType.LIGHT_CRUISER), 0)]),
+                    FleetColumn(3, CombatColumn.LEFT,
+                                ships=[(Ship(3, ShipType.LIGHT_CRUISER), 0)]),
+                    FleetColumn(4, CombatColumn.WAITING,
+                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                    FleetColumn(5, CombatColumn.WAITING,
+                                ships=[(Ship(10, ShipType.LIGHT_CRUISER), 0),
+                                       (Ship(10, ShipType.LIGHT_CRUISER), 0)]),
+                ))
+            ),
+            (
+                defender,
+                FleetList((
+                    FleetColumn(1, CombatColumn.RIGHT,
+                                ships=[]),
+                    FleetColumn(2, CombatColumn.MIDDLE,
+                                ships=[(Ship(2, ShipType.LIGHT_CRUISER), 0)]),
+                    FleetColumn(3, CombatColumn.LEFT,
+                                ships=[(Ship(1, ShipType.LIGHT_CRUISER), 0)]),
+                    FleetColumn(4, CombatColumn.WAITING,
+                                ships=[(Ship(1, ShipType.LIGHT_CRUISER), 0),
+                                       (Ship(1, ShipType.LIGHT_CRUISER), 0)]),
+                    FleetColumn(5, CombatColumn.WAITING,
+                                ships=[(Ship(1, ShipType.LIGHT_CRUISER), 0),
+                                       (Ship(1, ShipType.LIGHT_CRUISER), 0)]),
+                ))
+            ),
+            CombatRound.MISSILE_ONE
+        )
+
+        self.assertEqual(
+            """`!!! Combat status - round 1 !!!`
+Attacker: `ATTACKER`
+Defender: `DEFENDER`
+Attacker ships in reserve:
+Fleet column 4
+Ships: `Light Cruiser (10/15)`, `Light Cruiser (10/15)`
+Fleet column 5
+Ships: `Light Cruiser (10/15)`, `Light Cruiser (10/15)`
+Defender ships reserve:
+Fleet column 4
+Ships: `Light Cruiser (1/15)`, `Light Cruiser (1/15)`
+Fleet column 5
+Ships: `Light Cruiser (1/15)`, `Light Cruiser (1/15)`
+```
+|         Left         |        Middle        |        Right         |
+|----------------------|----------------------|----------------------|
+| Light Cruiser (3/15) | Light Cruiser (2/15) | Light Cruiser (1/15) |
+|        -----         |        -----         |        -----         |
+| Light Cruiser (1/15) | Light Cruiser (2/15) |                      |
+```""",
+            str(combat_status)
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

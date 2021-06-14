@@ -499,6 +499,13 @@ async def allow_fleet_switch(channel: discord.TextChannel, combat_status: Combat
             to_swap_in = ship_list[swap_react.emoji]
 
         fleet.swap_columns(emojis_to_add[react.emoji], to_swap_in)
+        await channel.send(
+            '{} swapped {} with {}'.format(
+                user_to_mention.mention,
+                emojis_to_add[react.emoji],
+                to_swap_in
+            )
+        )
 
 
 bot.run(TOKEN)
