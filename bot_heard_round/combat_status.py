@@ -134,10 +134,10 @@ class CombatStatus:
             to_add = {}
 
             for column in CombatColumn.active_columns():
-                if i_attacker_pos > len(attacker_fleet_activated[CombatColumn.LEFT]):
+                if i_attacker_pos > len(attacker_fleet_activated[column]):
                     ship = ''
                 else:
-                    ship = str(attacker_fleet_activated[CombatColumn.LEFT][i_attacker_pos - 1][0])
+                    ship = str(attacker_fleet_activated[column][i_attacker_pos - 1][0])
 
                 to_add[column] = ship
 
@@ -153,10 +153,10 @@ class CombatStatus:
             to_add = {}
 
             for column in CombatColumn.active_columns():
-                if i >= len(defender_fleet_activated[CombatColumn.LEFT]):
+                if i >= len(defender_fleet_activated[column]):
                     ship = ''
                 else:
-                    ship = str(defender_fleet_activated[CombatColumn.LEFT][i][0])
+                    ship = str(defender_fleet_activated[column][i][0])
 
                 to_add[column] = ship
 
